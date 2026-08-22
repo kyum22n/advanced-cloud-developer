@@ -8,7 +8,7 @@ resources:
 images:
   - name: myapp
     newName: acrmyappstg.azurecr.io/myapp
-    newTag: PLACEHOLDER
+    newTag: stg-afd30ab
 replicas:
   - name: myapp
     count: 2
