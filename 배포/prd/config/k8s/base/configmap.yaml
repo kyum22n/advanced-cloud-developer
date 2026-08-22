@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myapp-config
+  namespace: myapp-prd
+data:
+  APP_ENV: "prd"
+  PORT: "8080"
+  DB_PORT: "5432"
+  DB_NAME: "appdb"
+  DB_SSL: "true"          # PaaS PostgreSQL 은 TLS 필수
+  DB_POOL_MAX: "10"
+  # DB_HOST / DB_USER / DB_PASSWORD 는 Key Vault → CSI 로 주입 (아래 secretprovider.yaml)

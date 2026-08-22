@@ -1,0 +1,156 @@
+openapi: 3.0.3
+info:
+  title: 나만의 업무 앱 API
+  version: "1.0.0"
+  description: |
+    설계/공통/03_REST_API_설계서.md 가 정본이며, 이 파일은 그 계약을 기계가 읽을 수 있게 옮긴 것이다.
+    Spring Boot · NestJS · FastAPI 세 구현은 모두 이 계약을 동일하게 만족해야 한다.
+servers:
+  - url: http://localhost:8080
+    description: dev (k3d 포트 매핑)
+paths:
+  /healthz:
+    get:
+      summary: 생존 프로브 — 의존성을 확인하지 않는다
+      responses:
+        "200":
+          description: 프로세스 정상
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+  /readyz:
+    get:
+      summary: 준비 프로브 — DB 연결을 실제로 확인한다
+      responses:
+        "200":
+          description: 준비 완료
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ready" }
+        "503":
+          description: 의존 서비스 미준비
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Ready" }
+  /version:
+    get:
+      summary: 배포 버전·환경·인증 방식
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Version" }
+  /api/items:
+    get:
+      summary: 항목 목록 (최신순 최대 200건)
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 200, default: 200 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ItemList" }
+    post:
+      summary: 항목 등록
+      parameters:
+        - in: header
+          name: X-User
+          schema: { type: string }
+          description: 감사로그의 행위자. 없으면 anonymous
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ItemCreate" }
+      responses:
+        "201":
+          description: 생성됨
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Item" }
+        "400":
+          description: 입력 검증 실패
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/summary:
+    get:
+      summary: ISO 주차별 집계 (주차 오름차순)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Summary" }
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status, env]
+      properties:
+        status: { type: string, example: ok }
+        env: { type: string, example: dev }
+    Ready:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [ready, not-ready] }
+        reason: { type: string }
+    Version:
+      type: object
+      required: [version, env]
+      properties:
+        version: { type: string, example: dev-a1b2c3d }
+        env: { type: string, example: dev }
+        auth:
+          type: object
+          description: 인증 '방식'만 노출한다. 자격 증명 값은 어떤 경우에도 담지 않는다.
+          properties:
+            mode: { type: string, enum: [entra, password] }
+            user: { type: string }
+            workloadIdentity: { type: boolean }
+            passwordConfigured: { type: boolean }
+    Item:
+      type: object
+      required: [id, title, amount, createdAt]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        amount: { type: number }
+        createdAt: { type: string, format: date-time }
+    ItemCreate:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1 }
+        amount: { type: number, default: 0 }
+    ItemList:
+      type: object
+      required: [count, items]
+      properties:
+        count: { type: integer }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Item" }
+    Summary:
+      type: object
+      required: [weeks]
+      properties:
+        weeks:
+          type: array
+          items:
+            type: object
+            required: [week, count, amount]
+            properties:
+              week: { type: string, example: 2026-W10 }
+              count: { type: integer }
+              amount: { type: number }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }

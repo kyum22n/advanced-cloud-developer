@@ -1,0 +1,14 @@
+{
+  "name": "myapp-html5",
+  "version": "1.0.0",
+  "private": true,
+  "description": "나만의 업무 앱 — HTML5 + 바닐라 JS 프런트엔드 (빌드 단계 없음)",
+  "scripts": {
+    "lint": "eslint \"public/**/*.js\" --max-warnings 0",
+    "verify:static": "npm run lint",
+    "serve": "python -m http.server 5500 --directory public"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0"
+  }
+}

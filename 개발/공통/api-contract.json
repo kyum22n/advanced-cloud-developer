@@ -1,0 +1,21 @@
+{
+  "$comment": "정적 검증기(정적검증/verify_static.py)가 읽는 기계 판독용 계약 요약. openapi.yaml 과 항상 일치해야 한다.",
+  "endpoints": [
+    { "id": "health",  "method": "GET",  "path": "/healthz",     "write": false },
+    { "id": "ready",   "method": "GET",  "path": "/readyz",      "write": false },
+    { "id": "version", "method": "GET",  "path": "/version",     "write": false },
+    { "id": "list",    "method": "GET",  "path": "/api/items",   "write": false },
+    { "id": "create",  "method": "POST", "path": "/api/items",   "write": true  },
+    { "id": "summary", "method": "GET",  "path": "/api/summary", "write": false }
+  ],
+  "env": {
+    "required": ["APP_ENV", "PORT", "DB_HOST", "DB_PORT", "DB_NAME", "DB_USER"],
+    "optional": ["DB_PASSWORD", "DB_SSL", "DB_POOL_MAX", "APP_VERSION", "DB_AUTH_MODE"],
+    "forbiddenLiterals": ["password=", "pwd=", "secret=", "AccountKey=", "BEGIN RSA PRIVATE KEY"]
+  },
+  "container": {
+    "mustRunAsNonRoot": true,
+    "mustBeMultiStage": true,
+    "forbiddenBaseTags": ["latest"]
+  }
+}

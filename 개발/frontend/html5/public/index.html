@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>나만의 업무 앱</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>나만의 업무 앱</h1>
+      <span class="env" data-testid="env-badge">-</span>
+      <span class="ver" data-testid="version-badge">-</span>
+    </header>
+
+    <main>
+      <section class="panel">
+        <h2>항목 등록</h2>
+        <form id="create-form" data-testid="create-form" novalidate>
+          <label for="title">제목</label>
+          <input id="title" name="title" data-testid="input-title" maxlength="200" required />
+
+          <label for="amount">금액</label>
+          <input id="amount" name="amount" data-testid="input-amount" inputmode="decimal" value="0" />
+
+          <button type="submit" data-testid="btn-submit">등록</button>
+        </form>
+        <p class="error" data-testid="error-message" role="alert" hidden></p>
+      </section>
+
+      <section class="panel">
+        <h2>항목 목록</h2>
+        <p class="empty" data-testid="empty-message" hidden>등록된 항목이 없습니다.</p>
+        <table data-testid="item-table">
+          <thead>
+            <tr><th>ID</th><th>제목</th><th>금액</th><th>생성 시각</th></tr>
+          </thead>
+          <tbody data-testid="item-tbody"></tbody>
+        </table>
+      </section>
+
+      <section class="panel">
+        <h2>주차별 집계</h2>
+        <table data-testid="summary-table">
+          <thead>
+            <tr><th>주차</th><th>건수</th><th>합계</th></tr>
+          </thead>
+          <tbody data-testid="summary-tbody"></tbody>
+        </table>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

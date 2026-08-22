@@ -1,0 +1,30 @@
+[project]
+name = "myapp-fastapi"
+version = "1.0.0"
+description = "나만의 업무 앱 — FastAPI 구현 (개발/공통/openapi.yaml 계약 준수)"
+requires-python = ">=3.10"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"   # 컨테이너는 3.11 이지만 로컬 3.10 에서도 동일하게 돌아야 한다
+exclude = [".venv", "__pycache__"]
+
+[tool.ruff.lint]
+# 규칙은 «지킬 수 있는 만큼»만 켠다 — 무시하는 습관이 생기면 정적 검증이 무력해진다
+select = ["E", "F", "W", "I", "N", "UP", "B", "S", "C4", "SIM", "RET"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]   # 테스트에서는 assert 허용
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+disallow_any_unimported = false
+ignore_missing_imports = true
+exclude = "(^|/)(\\.venv|build)/"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

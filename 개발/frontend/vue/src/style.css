@@ -1,0 +1,78 @@
+:root {
+  --navy: #243a5e;
+  --blue: #004578;
+  --border: #c8d8e8;
+  --light: #eaf3fb;
+  --text: #1f1f1f;
+  --danger: #d83b01;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Malgun Gothic", system-ui, sans-serif;
+  color: var(--text);
+  background: #fff;
+}
+
+.topbar {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 14px 20px;
+  background: var(--navy);
+  color: #fff;
+}
+
+.topbar h1 { font-size: 18px; margin: 0; }
+.topbar .env, .topbar .ver { font-size: 12px; opacity: 0.85; }
+
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 20px;
+  display: grid;
+  gap: 20px;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.panel h2 { font-size: 15px; margin: 0 0 12px; color: var(--blue); }
+
+form {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+input {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--blue);
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+button:hover { background: var(--navy); }
+
+.error { color: var(--danger); font-size: 13px; margin: 10px 0 0; }
+.empty { color: #666; font-size: 13px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { border-bottom: 1px solid var(--border); padding: 8px; text-align: left; }
+th { background: var(--light); color: var(--blue); }

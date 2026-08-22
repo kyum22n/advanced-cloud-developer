@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: myapp-prd
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: myapp
+  source:
+    repoURL: REPO_URL_PLACEHOLDER
+    targetRevision: main
+    path: 배포/prd/config/k8s/overlays/prd
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: myapp-prd
+  # 운영은 자동 동기화하지 않는다 — 사람이 승인(Sync)한 뒤에만 반영된다.
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 2
+      backoff: { duration: 30s, factor: 2, maxDuration: 5m }
+  revisionHistoryLimit: 20

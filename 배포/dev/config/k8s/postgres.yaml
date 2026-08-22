@@ -1,0 +1,43 @@
+# 개발 전용 in-cluster PostgreSQL — 데이터 영속성 요구 없음(재생성 전제)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: myapp-dev
+spec:
+  selector: { app: postgres }
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: myapp-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports: [{ containerPort: 5432 }]
+          env:
+            - name: POSTGRES_DB
+              valueFrom: { configMapKeyRef: { name: myapp-config, key: DB_NAME } }
+            - name: POSTGRES_USER
+              valueFrom: { configMapKeyRef: { name: myapp-config, key: DB_USER } }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: myapp-secret, key: DB_PASSWORD } }
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "appuser"] }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }

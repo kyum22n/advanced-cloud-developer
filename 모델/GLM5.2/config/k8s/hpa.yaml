@@ -1,0 +1,24 @@
+# CPU 사용률로 LLM 을 스케일하면 안 된다 — GPU 가 포화여도 CPU 는 한가하다.
+# 대기 큐 길이를 지표로 쓰려면 KEDA(Prometheus 스케일러)를 권장한다(04 §5-1).
+# 아래는 KEDA 가 없는 환경을 위한 최소 구성이며, 임계값은 60_perf 결과로 조정한다.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: glm
+  namespace: glm-serving
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: glm }
+  minReplicas: 1
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 80 }
+  behavior:
+    scaleUp:
+      # 콜드 스타트가 수 분이므로 성급하게 늘리지 않는다
+      stabilizationWindowSeconds: 120
+    scaleDown:
+      # 비싼 노드를 오래 잡고 있지 않도록 축소는 상대적으로 빠르게
+      stabilizationWindowSeconds: 300

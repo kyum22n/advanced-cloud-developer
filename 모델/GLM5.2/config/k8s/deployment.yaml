@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: glm
+  namespace: glm-serving
+  labels: { app: glm, workload: llm }
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: { app: glm }
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  template:
+    metadata:
+      labels:
+        app: glm
+        azure.workload.identity/use: "true"
+    spec:
+      serviceAccountName: glm-sa
+      # GPU 노드 풀에만 올라간다 (02 §2-1)
+      nodeSelector:
+        workload: llm
+      tolerations:
+        - key: "sku"
+          operator: "Equal"
+          value: "gpu"
+          effect: "NoSchedule"
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: vllm
+          image: ACR_LOGIN_SERVER_PLACEHOLDER/glm:TAG_PLACEHOLDER
+          ports: [{ containerPort: 8000, name: http }]
+          envFrom:
+            - configMapRef: { name: glm-config }
+            - secretRef: { name: glm-secret }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          resources:
+            # GPU 는 requests=limits 로 고정 할당된다 (부분 할당 불가)
+            limits:
+              nvidia.com/gpu: 1
+              memory: "64Gi"
+              cpu: "8"
+            requests:
+              nvidia.com/gpu: 1
+              memory: "32Gi"
+              cpu: "4"
+          # 모델 로딩에 수 분이 걸린다 — 짧게 잡으면 무한 재시작에 빠진다 (04 §4)
+          startupProbe:
+            httpGet: { path: /health, port: 8000 }
+            failureThreshold: 60
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: 8000 }
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: { path: /v1/models, port: 8000 }
+            periodSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - { name: models, mountPath: /models }
+            # /dev/shm 이 작으면 텐서 병렬이 실패한다 (04 §4)
+            - { name: dshm, mountPath: /dev/shm }
+            - { name: kv, mountPath: /mnt/secrets, readOnly: true }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        # 노드 로컬 캐시 — 같은 노드 재기동은 다운로드를 건너뛴다 (02 §3)
+        - name: models
+          emptyDir: { sizeLimit: 300Gi }
+        - name: dshm
+          emptyDir: { medium: Memory, sizeLimit: 8Gi }
+        - name: kv
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes: { secretProviderClass: glm-kv }
+        - name: tmp
+          emptyDir: {}

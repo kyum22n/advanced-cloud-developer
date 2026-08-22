@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: myapp-prd
+resources:
+  - ../../base
+# ▼ 운영 배포의 단일 진실. 승격(promote) 스크립트가 stg 에서 검증된 태그를 여기에 기록한다.
+images:
+  - name: myapp
+    newName: acrmyappprd.azurecr.io/myapp
+    newTag: PLACEHOLDER
+replicas:
+  - name: myapp
+    count: 3

@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: myapp-stg
+resources:
+  - ../../base
+# ▼ 이 값이 배포의 '단일 진실'입니다. 04_build_push.ps1 이 이 파일을 갱신하고
+#   Git 에 커밋하면 Argo CD 가 그것을 감지해 클러스터에 반영합니다.
+images:
+  - name: myapp
+    newName: acrmyappstg.azurecr.io/myapp
+    newTag: PLACEHOLDER
+replicas:
+  - name: myapp
+    count: 2

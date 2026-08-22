@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: glm
+  namespace: glm-serving
+spec:
+  # ClusterIP — 모델 엔드포인트를 인터넷에 두지 않는다 (ADR-G-06)
+  type: ClusterIP
+  selector: { app: glm }
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000

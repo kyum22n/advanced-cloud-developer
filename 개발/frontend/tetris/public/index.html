@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>웹 테트리스</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>웹 테트리스</h1>
+      <span class="badge" data-testid="score">점수: 0</span>
+      <span class="badge" data-testid="level">레벨: 1</span>
+      <span class="badge" data-testid="state-badge">준비</span>
+    </header>
+
+    <main>
+      <section class="board-wrap">
+        <canvas id="board" data-testid="board-canvas" width="300" height="600"></canvas>
+      </section>
+
+      <aside class="side-panel">
+        <div class="panel-box">
+          <h2>다음</h2>
+          <canvas id="next" data-testid="next-canvas" width="120" height="120"></canvas>
+          <p class="mini-label" data-testid="next-label">-</p>
+        </div>
+        <div class="panel-box">
+          <h2>홀드</h2>
+          <canvas id="hold" data-testid="hold-canvas" width="120" height="120"></canvas>
+          <p class="mini-label" data-testid="hold-label">-</p>
+        </div>
+        <p class="help">
+          ← → 이동 · ↓ 소프트드롭 · ↑ 회전<br />
+          Space 하드드롭 · C 홀드 · P 일시정지 · R 재시작
+        </p>
+      </aside>
+    </main>
+
+    <!-- E2E 안정적 검증용 상태 스냅샷(화면에는 보이지 않음). data-testid 로만 읽는다. -->
+    <pre data-testid="debug-state" class="visually-hidden"></pre>
+
+    <script src="./js/scoreRule.js"></script>
+    <script src="./js/srsKick.js"></script>
+    <script src="./js/engine.js"></script>
+    <script src="./js/main.js"></script>
+  </body>
+</html>

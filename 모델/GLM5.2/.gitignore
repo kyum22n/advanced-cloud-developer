@@ -1,0 +1,13 @@
+# 실행 리포트 — 결과이지 소스가 아니다
+config/scripts/reports/
+__pycache__/
+*.pyc
+
+# 모델 가중치 — 저장소에 넣지 않는다 (Blob 에 둔다)
+weights/
+*.safetensors
+*.bin
+*.gguf
+
+# 빌드 임시 파일
+config/Dockerfile.build

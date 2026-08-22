@@ -1,0 +1,13 @@
+{
+  "name": "tetris-frontend",
+  "version": "1.0.0",
+  "description": "APP-B 웹 테트리스 — 빌드 없는 바닐라 JS + Canvas, nginx 정적 서빙",
+  "scripts": {
+    "test:unit": "node --test \"test/unit/**/*.test.js\"",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: myapp-stg
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: myapp
+  source:
+    repoURL: REPO_URL_PLACEHOLDER
+    targetRevision: main
+    path: 배포/stg/config/k8s/overlays/stg
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: myapp-stg
+  syncPolicy:
+    automated:
+      prune: true          # Git 에서 지운 리소스는 클러스터에서도 제거
+      selfHeal: true       # 수동 변경(드리프트)은 Git 상태로 자동 복구
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 3
+      backoff: { duration: 10s, factor: 2, maxDuration: 3m }

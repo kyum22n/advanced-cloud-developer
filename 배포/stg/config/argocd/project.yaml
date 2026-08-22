@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: myapp
+  namespace: argocd
+spec:
+  description: 3차시 실습 앱 프로젝트 (stg)
+  sourceRepos:
+    - '*'                      # 실습용. 운영은 특정 저장소만 허용할 것
+  destinations:
+    - namespace: 'myapp-*'
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'

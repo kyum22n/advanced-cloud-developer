@@ -1,0 +1,7 @@
+node_modules
+test
+playwright.config.js
+**/캡처
+**/report
+*.log
+.git

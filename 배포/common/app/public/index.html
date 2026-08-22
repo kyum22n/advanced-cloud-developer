@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>나만의 업무 앱 — 샘플</title>
+  <style>
+    :root { --line:#c8d8e8; --deep:#004578; --tint:#eaf3fb; }
+    * { box-sizing: border-box; }
+    body { font-family: "Malgun Gothic", system-ui, sans-serif; margin: 0; color: #1f1f1f; background: #fff; }
+    header { background: var(--deep); color: #fff; padding: 16px 24px; }
+    header h1 { margin: 0; font-size: 18px; }
+    header small { opacity: .8; }
+    main { padding: 24px; max-width: 900px; }
+    .row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+    input, button { padding: 8px 10px; font-size: 14px; border: 1px solid var(--line); border-radius: 6px; }
+    button { background: var(--deep); color: #fff; border: none; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { border: 1px solid var(--line); padding: 8px; text-align: left; }
+    th { background: var(--tint); color: var(--deep); }
+    #empty { color: #605e5c; padding: 16px; border: 1px dashed var(--line); border-radius: 6px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>나만의 업무 앱 — 샘플</h1>
+    <small id="envLabel">환경: 확인 중…</small>
+  </header>
+  <main>
+    <div class="row">
+      <input id="title" placeholder="항목 제목" data-testid="title" />
+      <input id="amount" placeholder="금액" type="number" value="0" data-testid="amount" />
+      <button id="add" data-testid="add">추가</button>
+      <button id="reload" data-testid="reload">새로고침</button>
+    </div>
+    <div id="empty" class="hidden" data-testid="empty">데이터가 없습니다. 항목을 추가해 보세요.</div>
+    <table id="tbl" data-testid="table">
+      <thead><tr><th>ID</th><th>제목</th><th>금액</th><th>생성 시각</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </main>
+  <script>
+    async function loadEnv() {
+      try { const r = await fetch('/version'); const j = await r.json();
+        document.getElementById('envLabel').textContent = `환경: ${j.env} · 버전: ${j.version}`; } catch {}
+    }
+    async function load() {
+      const r = await fetch('/api/items'); const j = await r.json();
+      const tb = document.getElementById('tbody'); tb.innerHTML = '';
+      document.getElementById('empty').classList.toggle('hidden', j.count > 0);
+      document.getElementById('tbl').classList.toggle('hidden', j.count === 0);
+      for (const it of j.items) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${it.id}</td><td>${it.title}</td><td>${it.amount}</td><td>${new Date(it.createdAt).toLocaleString('ko-KR')}</td>`;
+        tb.appendChild(tr);
+      }
+    }
+    document.getElementById('add').onclick = async () => {
+      const title = document.getElementById('title').value;
+      const amount = Number(document.getElementById('amount').value || 0);
+      const r = await fetch('/api/items', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, amount }) });
+      if (!r.ok) { alert('입력값을 확인하세요 (제목은 필수).'); return; }
+      document.getElementById('title').value = '';
+      await load();
+    };
+    document.getElementById('reload').onclick = load;
+    loadEnv(); load();
+  </script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "$comment": [
+    "모델 제원 정본. 공식 모델 카드와 config.json 을 보고 값을 채운 뒤 scripts/sizing.py 를 실행한다.",
+    "null 인 항목은 '아직 확인하지 않음'을 뜻하며, sizing.py 가 계산을 거부한다 —",
+    "확인하지 않은 값을 추정해서 계산하면 GPU 수를 잘못 잡게 되기 때문이다."
+  ],
+  "modelId": "GLM-5.2",
+  "source": {
+    "repo": "<Hugging Face 저장소 경로로 교체>",
+    "revision": "<커밋 해시 또는 태그로 고정 — main 은 재현되지 않는다>",
+    "license": "<라이선스 식별자로 교체>",
+    "licenseChecked": false,
+    "commercialUseAllowed": null
+  },
+  "architecture": {
+    "$comment": "config.json 에서 그대로 옮긴다. MoE 라면 totalParams 와 activeParams 가 다르다.",
+    "isMoE": null,
+    "totalParamsB": null,
+    "activeParamsB": null,
+    "numLayers": null,
+    "numKeyValueHeads": null,
+    "headDim": null,
+    "maxContextTokens": null
+  },
+  "serving": {
+    "engine": "vllm",
+    "engineVersion": "<버전 고정 — latest 금지>",
+    "engineSupportsArchitecture": null,
+    "dtype": "fp8",
+    "dtypeOptions": ["bf16", "fp8", "int4-awq"],
+    "kvCacheDtype": "fp8",
+    "gpuMemoryUtilization": 0.90,
+    "maxModelLen": null,
+    "maxConcurrentTokens": 16384,
+    "tensorParallelSize": null
+  },
+  "targets": {
+    "$comment": "먼저 목표를 정하고 측정한다. 정하지 않으면 '느리지만 되니까'로 넘어가게 된다.",
+    "ttftSeconds": 1.0,
+    "tpotMillis": 50,
+    "costPerMillionTokensUsd": null
+  }
+}

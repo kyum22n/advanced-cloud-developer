@@ -1,0 +1,14 @@
+{
+  "name": "myapp",
+  "version": "1.0.0",
+  "description": "3차시 나만의 업무 앱 실습 — APP-B 웹 테트리스 배포 단위 (정적 nginx, 상태·DB 없음)",
+  "scripts": {
+    "test:unit": "node --test \"test/unit/**/*.test.js\"",
+    "test:integration": "node -e \"console.log('설계/공통/06 §3: 통합(Integration) TC 는 APP-A(나만의 업무 앱) 전용입니다. APP-B 웹 테트리스는 무상태 정적 앱(NFR-B-04)이라 통합 레벨 TC 가 없어 건너뜁니다.')\"",
+    "test:e2e": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0"
+  },
+  "license": "MIT"
+}

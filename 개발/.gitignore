@@ -1,0 +1,17 @@
+# 빌드 산출물 · 의존성 — 저장소에 넣지 않는다
+node_modules/
+dist/
+target/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 정적 검증 리포트 — 실행 결과이지 소스가 아니다
+정적검증/reports/
+
+# 로컬 설정
+*.local.json
+.env

@@ -1,0 +1,27 @@
+# 값은 모두 환경 변수로 주입한다 — 코드·이미지에 비밀을 두지 않는다.
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+
+spring:
+  application:
+    name: myapp
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:appdb}?sslmode=${DB_SSLMODE:prefer}
+    username: ${DB_USER:appuser}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${DB_POOL_MAX:5}
+      connection-timeout: 5000
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+logging:
+  level:
+    root: INFO

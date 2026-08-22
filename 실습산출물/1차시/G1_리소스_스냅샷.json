@@ -1,0 +1,103 @@
+﻿{
+    "rg-advdev-lkm-data":  {
+                               "value":  [
+                                             {
+                                                 "changedTime":  "2026-08-06T06:01:59.207573+00:00",
+                                                 "createdTime":  "2026-08-06T05:51:34.817637+00:00",
+                                                 "extendedLocation":  null,
+                                                 "id":  "/subscriptions/2097fe45-213d-4678-beb7-65bf83638807/resourceGroups/rg-advdev-lkm-data/providers/Microsoft.Storage/storageAccounts/stadvdevlkm6305",
+                                                 "identity":  null,
+                                                 "kind":  "StorageV2",
+                                                 "location":  "koreacentral",
+                                                 "managedBy":  null,
+                                                 "name":  "stadvdevlkm6305",
+                                                 "plan":  null,
+                                                 "properties":  null,
+                                                 "provisioningState":  "Succeeded",
+                                                 "resourceGroup":  "rg-advdev-lkm-data",
+                                                 "sku":  {
+                                                             "capacity":  null,
+                                                             "family":  null,
+                                                             "model":  null,
+                                                             "name":  "Standard_ZRS",
+                                                             "size":  null,
+                                                             "tier":  "Standard"
+                                                         },
+                                                 "tags":  {
+
+                                                          },
+                                                 "type":  "Microsoft.Storage/storageAccounts"
+                                             },
+                                             {
+                                                 "changedTime":  "2026-08-06T06:58:19.728784+00:00",
+                                                 "createdTime":  "2026-08-06T06:44:08.270493+00:00",
+                                                 "extendedLocation":  null,
+                                                 "id":  "/subscriptions/2097fe45-213d-4678-beb7-65bf83638807/resourceGroups/rg-advdev-lkm-data/providers/Microsoft.DBforMySQL/flexibleServers/mysql-advdev-lkm",
+                                                 "identity":  null,
+                                                 "kind":  null,
+                                                 "location":  "koreacentral",
+                                                 "managedBy":  null,
+                                                 "name":  "mysql-advdev-lkm",
+                                                 "plan":  null,
+                                                 "properties":  null,
+                                                 "provisioningState":  "Succeeded",
+                                                 "resourceGroup":  "rg-advdev-lkm-data",
+                                                 "sku":  {
+                                                             "capacity":  null,
+                                                             "family":  null,
+                                                             "model":  null,
+                                                             "name":  "Standard_B1ms",
+                                                             "size":  null,
+                                                             "tier":  "Burstable"
+                                                         },
+                                                 "systemData":  {
+                                                                    "createdAt":  "2026-08-06T06:44:28.4390573Z"
+                                                                },
+                                                 "tags":  null,
+                                                 "type":  "Microsoft.DBforMySQL/flexibleServers"
+                                             },
+                                             {
+                                                 "changedTime":  "2026-08-06T07:15:55.018093+00:00",
+                                                 "createdTime":  "2026-08-06T07:15:33.014150+00:00",
+                                                 "extendedLocation":  null,
+                                                 "id":  "/subscriptions/2097fe45-213d-4678-beb7-65bf83638807/resourceGroups/rg-advdev-lkm-data/providers/Microsoft.OperationalInsights/workspaces/law-advdev-lkm",
+                                                 "identity":  null,
+                                                 "kind":  null,
+                                                 "location":  "koreacentral",
+                                                 "managedBy":  null,
+                                                 "name":  "law-advdev-lkm",
+                                                 "plan":  null,
+                                                 "properties":  null,
+                                                 "provisioningState":  "Succeeded",
+                                                 "resourceGroup":  "rg-advdev-lkm-data",
+                                                 "sku":  null,
+                                                 "tags":  null,
+                                                 "type":  "Microsoft.OperationalInsights/workspaces"
+                                             }
+                                         ],
+                               "Count":  3
+                           },
+    "NetworkWatcherRG":  {
+                             "value":  [
+                                           {
+                                               "changedTime":  "2026-08-05T12:28:05.838276+00:00",
+                                               "createdTime":  "2026-08-05T12:18:05.611197+00:00",
+                                               "extendedLocation":  null,
+                                               "id":  "/subscriptions/2097fe45-213d-4678-beb7-65bf83638807/resourceGroups/NetworkWatcherRG/providers/Microsoft.Network/networkWatchers/NetworkWatcher_koreacentral",
+                                               "identity":  null,
+                                               "kind":  null,
+                                               "location":  "koreacentral",
+                                               "managedBy":  null,
+                                               "name":  "NetworkWatcher_koreacentral",
+                                               "plan":  null,
+                                               "properties":  null,
+                                               "provisioningState":  "Succeeded",
+                                               "resourceGroup":  "NetworkWatcherRG",
+                                               "sku":  null,
+                                               "tags":  null,
+                                               "type":  "Microsoft.Network/networkWatchers"
+                                           }
+                                       ],
+                             "Count":  1
+                         }
+}

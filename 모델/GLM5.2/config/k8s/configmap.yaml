@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: glm-config
+  namespace: glm-serving
+data:
+  # 비밀이 아닌 값만 둔다. API 키·HF 토큰은 Key Vault → CSI 로 주입한다.
+  MODEL_ID: "MODEL_ID_PLACEHOLDER"
+  MODEL_BLOB_URL: "MODEL_BLOB_URL_PLACEHOLDER"
+  MODEL_CACHE_DIR: "/models"
+  DTYPE: "fp8"
+  KV_CACHE_DTYPE: "fp8"
+  MAX_MODEL_LEN: "32768"
+  GPU_MEMORY_UTILIZATION: "0.90"
+  TENSOR_PARALLEL_SIZE: "1"
+  # 프롬프트·응답 본문을 로그에 남기지 않는다 (02 §6 · 06 G-S-05)
+  VLLM_LOGGING_LEVEL: "INFO"
+  VLLM_LOG_REQUESTS: "false"

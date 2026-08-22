@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: glm
+  namespace: glm-serving
+spec:
+  # Spot 회수·노드 순환 중 동시 축출을 막는다
+  minAvailable: 1
+  selector:
+    matchLabels: { app: glm }
