@@ -62,7 +62,9 @@ kubectl create namespace $ans --dry-run=client -o yaml | kubectl apply -f -
 $installed = kubectl get deploy argocd-server -n $ans -o name 2>$null
 if (-not $installed) {
     Invoke-Checked -What 'argocd 매니페스트 적용' -Script {
-        kubectl apply -n $ans -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+        # --server-side 필수: Argo CD 의 CRD 는 client-side apply 가 쓰는
+        # last-applied-configuration 주석의 262144바이트 한도를 넘는다.
+        kubectl apply -n $ans --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
     }
 } else { Write-Info 'Argo CD 가 이미 설치되어 있습니다 — 재사용' }
 
