@@ -1,7 +1,9 @@
 # 3차시 — 웹 테트리스(APP-B) 개발 · dev(k3d) → stg(AKS+ArgoCD) 배포 결과산출물
 
 > 대상 앱: `설계/공통/01_기능명세서.md` APP-B 웹 테트리스 (기존 APP-A 나만의 업무 앱을 대체)
-> 소스: [`개발/frontend/tetris/`](../../개발/frontend/tetris/) · 배포 단위: [`실습산출물/3차시/myapp/`](myapp/)
+> 소스: [`개발/frontend/tetris/`](../../개발/frontend/tetris/) · 배포 단위: [`실습산출물/3차시/tetris/`](tetris/)
+> ⚠️ 이후 `실습산출물/3차시/myapp/`에 별도로 «나만의 업무 앱»(APP-A)을 만들면서, 이 문서가 다루는 웹 테트리스 배포 단위는
+> `myapp`에서 `tetris`로 이름을 바꿨다(`git mv`). 배포 스크립트는 `-AppPath`로 지정해야 이 디렉터리를 대상으로 한다.
 > Git 저장소: https://github.com/kyum22n/advanced-cloud-developer (master)
 
 ---
@@ -111,8 +113,8 @@ selfHeal: 레플리카를 2→1로 수동 변경 → Argo CD가 자동으로 2�
 | 종류 | 경로 |
 | --- | --- |
 | 소스 | [`개발/frontend/tetris/`](../../개발/frontend/tetris/) |
-| 배포 단위 | [`실습산출물/3차시/myapp/`](myapp/) |
+| 배포 단위 | [`실습산출물/3차시/tetris/`](tetris/) |
 | dev 테스트 리포트 | `배포/dev/reports/dev_*.json` |
 | stg 테스트 리포트 | `배포/stg/reports/stg_*.json` |
-| E2E 캡처 | `실습산출물/3차시/myapp/test/e2e/캡처/*.png` (실행할 때마다 재생성) |
+| E2E 캡처 | `실습산출물/3차시/tetris/test/e2e/캡처/*.png` (실행할 때마다 재생성) |
 | Git 커밋 이력 | `afd30ab` 초기 커밋 → `9cd2da6` stg 이미지 태그 배포 → `b3c6410` Argo CD 설치 수정 |
