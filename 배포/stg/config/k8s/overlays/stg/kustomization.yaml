@@ -11,4 +11,4 @@ images:
     newTag: stg-7a76ec0
 replicas:
   - name: myapp
-    count: 2
+    count: 1
