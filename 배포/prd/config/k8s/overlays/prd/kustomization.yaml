@@ -7,7 +7,7 @@ resources:
 images:
   - name: myapp
     newName: acrmyappprd.azurecr.io/myapp
-    newTag: PLACEHOLDER
+    newTag: prd-909b029
 replicas:
   - name: myapp
     count: 3

@@ -11,3 +11,7 @@ data:
   DB_SSL: "true"          # PaaS PostgreSQL 은 TLS 필수
   DB_POOL_MAX: "10"
   # DB_HOST / DB_USER / DB_PASSWORD 는 Key Vault → CSI 로 주입 (아래 secretprovider.yaml)
+  # KEYVAULT_NAME: 20_config.ps1 실행 결과(reports/infra-state.json의 keyvaultName)로 교체해서 채운다.
+  # myapp이 GITHUB_TOKEN/NOTION_TOKEN을 env(k8s Secret, 평소)에서 못 찾을 때
+  # 워크로드 ID로 이 Key Vault를 직접 조회하는 자가 복구 경로(src/secrets.js)에 쓰인다.
+  KEYVAULT_NAME: "kv-myapp-prd-lsrok"

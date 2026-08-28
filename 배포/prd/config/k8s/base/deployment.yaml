@@ -54,6 +54,11 @@ spec:
           volumeMounts:
             - { name: kv, mountPath: /mnt/secrets, readOnly: true }
             - { name: tmp, mountPath: /tmp }
+            # myapp은 better-sqlite3(파일 기반 DB)를 /app/data에 쓴다 — readOnlyRootFilesystem이라
+            # 이 경로만 별도로 쓰기 가능한 볼륨을 마운트해야 한다.
+            # 주의: emptyDir는 파드 재생성 시 사라진다(비영속) — 운영에서는 Azure Files/managed disk 등
+            # 영속 볼륨(PVC)으로 교체가 필요하다(현재 미해결 항목, 06_배포스크립트_조정.md 참고).
+            - { name: data, mountPath: /app/data }
       volumes:
         - name: kv
           csi:
@@ -61,4 +66,6 @@ spec:
             readOnly: true
             volumeAttributes: { secretProviderClass: myapp-kv }
         - name: tmp
+          emptyDir: {}
+        - name: data
           emptyDir: {}
