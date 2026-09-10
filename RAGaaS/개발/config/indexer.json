@@ -1,0 +1,24 @@
+{
+  "name": "hr-ga-indexer",
+  "dataSourceName": "hr-ga-blob",
+  "targetIndexName": "hr-ga-chunks",
+  "skillsetName": "hr-ga-skillset",
+  "schedule": {
+    "interval": "PT5M"
+  },
+  "parameters": {
+    "batchSize": 50,
+    "maxFailedItems": 10,
+    "maxFailedItemsPerBatch": 5,
+    "configuration": {
+      "dataToExtract": "contentAndMetadata",
+      "parsingMode": "jsonLines"
+    }
+  },
+  "fieldMappings": [
+    {
+      "sourceFieldName": "doc_id",
+      "targetFieldName": "parent_id"
+    }
+  ]
+}

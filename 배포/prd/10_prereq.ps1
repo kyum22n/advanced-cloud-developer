@@ -30,10 +30,12 @@ Add-Check 'Azure 로그인' ($null -ne $acct) $(if($acct){$acct.name}else{'미�
 if ($acct) { Write-Ok ("구독: " + $acct.name) }
 
 # 운영은 공급자가 더 많이 필요하다
+$provNs = @('Microsoft.ContainerService','Microsoft.ContainerRegistry','Microsoft.KeyVault',
+            'Microsoft.Storage','Microsoft.OperationalInsights','Microsoft.Insights',
+            'Microsoft.Network','Microsoft.Monitor')
+if (-not [bool]$cfg.skipPaasData) { $provNs += @('Microsoft.DBforPostgreSQL','Microsoft.Cache') }
 if ($acct) {
-    foreach ($ns in @('Microsoft.ContainerService','Microsoft.ContainerRegistry','Microsoft.DBforPostgreSQL',
-                      'Microsoft.Cache','Microsoft.KeyVault','Microsoft.Storage','Microsoft.OperationalInsights',
-                      'Microsoft.Insights','Microsoft.Network','Microsoft.Monitor')) {
+    foreach ($ns in $provNs) {
         $state = az provider show -n $ns --query registrationState -o tsv 2>$null
         $ok = ($state -eq 'Registered')
         if (-not $ok) { Write-Warn2 ("{0} 미등록 — az provider register --namespace {0} --wait" -f $ns) }

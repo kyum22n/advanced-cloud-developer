@@ -1,0 +1,141 @@
+{
+  "name": "hr-ga-skillset",
+  "description": "인사·총무 문서 청킹 + 임베딩 (통합 벡터화)",
+  "skills": [
+    {
+      "@odata.type": "#Microsoft.Skills.Text.SplitSkill",
+      "name": "split-into-chunks",
+      "description": "최대 1200자, 중첩 120자로 분할",
+      "context": "/document",
+      "textSplitMode": "pages",
+      "maximumPageLength": 1200,
+      "pageOverlapLength": 120,
+      "defaultLanguageCode": "ko",
+      "inputs": [
+        {
+          "name": "text",
+          "source": "/document/content"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "textItems",
+          "targetName": "pages"
+        }
+      ]
+    },
+    {
+      "@odata.type": "#Microsoft.Skills.Text.AzureOpenAIEmbeddingSkill",
+      "name": "embed-chunks",
+      "description": "text-embedding-3-large 로 1536차원 임베딩",
+      "context": "/document/pages/*",
+      "resourceUri": "https://{AZURE_OPENAI_RESOURCE}.openai.azure.com",
+      "deploymentId": "{EMBEDDING_DEPLOYMENT}",
+      "modelName": "text-embedding-3-large",
+      "dimensions": 1536,
+      "inputs": [
+        {
+          "name": "text",
+          "source": "/document/pages/*"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "embedding",
+          "targetName": "vector"
+        }
+      ]
+    }
+  ],
+  "indexProjections": {
+    "selectors": [
+      {
+        "targetIndexName": "hr-ga-chunks",
+        "parentKeyFieldName": "parent_id",
+        "sourceContext": "/document/pages/*",
+        "mappings": [
+          {
+            "name": "content",
+            "source": "/document/pages/*"
+          },
+          {
+            "name": "content_vector",
+            "source": "/document/pages/*/vector"
+          },
+          {
+            "name": "title",
+            "source": "/document/title"
+          },
+          {
+            "name": "category",
+            "source": "/document/category"
+          },
+          {
+            "name": "subcategory",
+            "source": "/document/subcategory"
+          },
+          {
+            "name": "topic",
+            "source": "/document/topic"
+          },
+          {
+            "name": "doc_type",
+            "source": "/document/doc_type"
+          },
+          {
+            "name": "doc_group",
+            "source": "/document/doc_group"
+          },
+          {
+            "name": "status",
+            "source": "/document/status"
+          },
+          {
+            "name": "version",
+            "source": "/document/version"
+          },
+          {
+            "name": "effective_date",
+            "source": "/document/effective_date"
+          },
+          {
+            "name": "expiry_date",
+            "source": "/document/expiry_date"
+          },
+          {
+            "name": "updated_at",
+            "source": "/document/updated_at"
+          },
+          {
+            "name": "security_level",
+            "source": "/document/security_level"
+          },
+          {
+            "name": "audience",
+            "source": "/document/audience"
+          },
+          {
+            "name": "owner_dept",
+            "source": "/document/owner_dept"
+          },
+          {
+            "name": "keywords",
+            "source": "/document/keywords"
+          },
+          {
+            "name": "source_uri",
+            "source": "/document/source_uri"
+          }
+        ]
+      }
+    ],
+    "parameters": {
+      "projectionMode": "skipIndexingParentDocuments"
+    }
+  },
+  "_설계메모": {
+    "한계": "SplitSkill 은 문서 유형별 분기를 표현할 수 없다",
+    "대안": "유형별 인덱서 분리 또는 로컬 청킹 후 푸시",
+    "청킹기준": "최대 1200자 · 중첩 120자 (로컬 실험으로 확정)"
+  }
+}

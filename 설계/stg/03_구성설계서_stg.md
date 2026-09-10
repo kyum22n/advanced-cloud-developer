@@ -169,8 +169,9 @@ replicas:
 | `argocd.repoUrl` | Application 매니페스트(20_config 가 자동 치환) |
 | `argocd.path` | 저장소 내 실제 폴더 경로 |
 | `app.namespace` | base 의 모든 `namespace` · overlay 의 `namespace` · Application `destination` |
-| `app.replicas` | overlay 의 `replicas.count` · PDB `minAvailable` 검토 |
-| `db.*` | base `configmap.yaml` (**Git 커밋 필요**) |
+| `app.replicas` | overlay 의 `replicas.count` · PDB `minAvailable` 검토 · [공통 05 §5-1](../공통/05_데이터모델설계서.md)(SQLite 는 파드별로 분리된다는 한계) |
+| `db.*` | base `configmap.yaml` (**Git 커밋 필요**) — **myapp 자체는 사용하지 않음**(SQLite), 코스 공통 샘플 앱과의 구조 비교용으로만 유지 |
+| `GITHUB_TOKEN`/`NOTION_TOKEN`/`NOTION_PARENT_PAGE_ID`(호스트 환경 변수) | `20_config.ps1` 재실행 → `myapp-secret` 갱신(`DB_PASSWORD` 와 함께 저장됨, [실습산출물/3차시/06_배포스크립트_조정.md](../../실습산출물/3차시/06_배포스크립트_조정.md) 참고) |
 
 > ⚠️ **stg 에서는 설정 변경이 «Git 커밋»을 동반합니다.** `kubectl edit` 으로 바꾸면 selfHeal 이 되돌립니다.
 

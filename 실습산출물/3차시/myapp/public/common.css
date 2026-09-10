@@ -1,0 +1,80 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Malgun Gothic", "Segoe UI", sans-serif;
+  background: #f4f6f9;
+  color: #1f2933;
+}
+header {
+  background: #16324f;
+  color: #fff;
+  padding: 16px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+header .title { font-size: 18px; font-weight: 700; }
+nav a {
+  color: #cfe3ff;
+  text-decoration: none;
+  margin-left: 20px;
+  font-size: 14px;
+}
+nav a.active, nav a:hover { color: #fff; font-weight: 700; }
+main { max-width: 960px; margin: 0 auto; padding: 24px 32px 60px; }
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  margin-bottom: 20px;
+}
+.card h2 { margin-top: 0; font-size: 16px; color: #16324f; }
+label { display:block; font-size: 13px; color:#52606d; margin-bottom: 6px; }
+input[type=text] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd2d9;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.btn {
+  display: inline-block;
+  background: #2b6cb0;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btn.secondary { background: #718096; }
+.btn.notion { background: #000; }
+.btn:hover { opacity: 0.9; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e4e7eb; }
+th { color: #52606d; font-weight: 600; background:#f8fafc; }
+.badge { display:inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; }
+.badge.ok { background:#e3f9e5; color:#1b7f3a; }
+.badge.fail { background:#fde8e8; color:#c53030; }
+.meta { font-size: 12px; color: #7b8794; margin-top: 4px; }
+.section-title { font-size: 13px; color:#7b8794; text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 8px; }
+.notice {
+  background: #fff8e1;
+  border: 1px solid #f0c419;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 16px;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.error-box {
+  background: #fdf1f0;
+  border: 1px solid #e8968f;
+  padding: 20px;
+  border-radius: 8px;
+}
+.error-box h3 { color: #c53030; margin-top: 0; }
+.footer-note { font-size: 12px; color:#9aa5b1; margin-top: 30px; }

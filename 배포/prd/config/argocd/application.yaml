@@ -8,7 +8,7 @@ spec:
   project: myapp
   source:
     repoURL: REPO_URL_PLACEHOLDER
-    targetRevision: main
+    targetRevision: TARGET_REVISION_PLACEHOLDER
     path: 배포/prd/config/k8s/overlays/prd
   destination:
     server: https://kubernetes.default.svc

@@ -28,11 +28,15 @@ if (Test-Path $buildFile) {
 Invoke-Checked -What '앱 매니페스트 적용' -Script { kubectl apply -f "$PSScriptRoot\config\k8s\app.yaml" }
 
 # 이미지 태그와 버전 환경 변수를 이번 빌드로 교체
+# 주의: "$name=$val" 형태를 `$name="$val"`처럼 나눠 쓰면 PowerShell 네이티브 인자 전달 과정에서
+# 토큰이 예기치 않게 쪼개질 수 있다(예: "deploy/myapp" + "myapp=..." → "deploy/" + "="). 한 문자열로 보간한다.
+$imageSpec = "$($cfg.app.name)=$($cfg.app.image):$tag"
 Invoke-Checked -What '이미지 태그 지정' -Script {
-    kubectl set image deploy/$($cfg.app.name) $($cfg.app.name)="$($cfg.app.image):$tag" -n $ns
+    kubectl set image "deploy/$($cfg.app.name)" $imageSpec -n $ns
 }
+$versionSpec = "APP_VERSION=$tag"
 Invoke-Checked -What 'APP_VERSION 주입' -Script {
-    kubectl set env deploy/$($cfg.app.name) APP_VERSION=$tag -n $ns
+    kubectl set env "deploy/$($cfg.app.name)" $versionSpec -n $ns
 }
 Invoke-Checked -What '롤아웃 완료 대기' -Script {
     kubectl rollout status deploy/$($cfg.app.name) -n $ns --timeout=180s

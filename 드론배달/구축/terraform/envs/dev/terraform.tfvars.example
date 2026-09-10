@@ -1,0 +1,50 @@
+# dev — 개발 환경.
+#
+# 원칙: «기능 차이가 아니라 규모 차이만» 둔다.
+#   · 워크로드 ID 는 dev 에서도 쓴다 — prd 에서만 나는 인증 문제를 미리 잡기 위해
+#   · VNet 은 예외 — 비용과 복잡도가 커서 dev 는 공용 엔드포인트를 쓴다.
+#     그래서 dev 에서 못 잡는 네트워크 문제가 있고, stg 가 그 역할을 한다.
+
+subscription_id = "00000000-0000-0000-0000-000000000000"   # ← 실제 구독 ID 로 교체
+owner           = "kyong94@example.com"                    # ← 실제 담당자로 교체
+location        = "koreacentral"
+
+# 네트워크 — 공용 엔드포인트 (비용 절감)
+vnet_enabled          = false
+public_network_access = true
+
+# 플랫폼
+acr_sku                    = "Basic"
+key_vault_purge_protection = false      # dev 는 지우고 다시 만들 수 있어야 한다
+
+# 메시징 — 최소 SKU
+service_bus_sku              = "Basic"
+event_hubs_sku               = "Basic"
+event_hubs_capacity          = 1
+event_hubs_max_capacity      = 1
+delivery_tracking_partitions = 2
+drone_status_partitions      = 2
+eventhub_retention_days      = 1
+
+# 데이터 — 서버리스·최소
+redis_sku              = "Basic"
+redis_family           = "C"
+redis_capacity         = 0
+cosmos_serverless      = true
+storage_replication    = "LRS"
+enable_zone_redundancy = false
+
+# 컴퓨팅 — 각 1 인스턴스
+spring_apps_sku      = "S0"
+instances_ingestion  = 1
+instances_workflow   = 1
+instances_delivery   = 1
+instances_package    = 1
+instances_dronesched = 1
+instances_history    = 1
+
+# 관측성 — 전량 추적 (문제를 찾는 것이 목적)
+log_retention_days        = 30
+trace_sampling_percentage = 100
+monthly_budget_amount     = 100
+budget_contact_emails     = ["kyong94@example.com"]

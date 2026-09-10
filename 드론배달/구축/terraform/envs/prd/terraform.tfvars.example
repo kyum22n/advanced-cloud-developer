@@ -1,0 +1,55 @@
+# prd — 운영 환경.
+#
+# ⛔ 이 환경에 적용하기 전 반드시 확인할 것
+#   ① stg 검증 결과 파일의 fail = 0
+#   ② terraform plan 에 destroy 대상 «데이터 저장소»가 없을 것
+#   ③ 운영 담당자의 별도 승인
+#
+# 이 파일의 값을 바꾸는 것은 운영 시스템을 바꾸는 것이다.
+
+subscription_id = "00000000-0000-0000-0000-000000000000"
+owner           = "kyong94@example.com"
+location        = "koreacentral"
+
+# 네트워크 — 허브‑스포크
+vnet_enabled          = true
+vnet_address_space    = "10.1.0.0/16"
+hub_vnet_id           = null            # ← 허브 VNet 리소스 ID 로 교체
+public_network_access = false           # ★ 프라이빗 엔드포인트만
+
+# 플랫폼
+acr_sku                    = "Premium"
+key_vault_purge_protection = true       # ★ 운영 비밀을 영구 삭제할 수 없게 한다
+
+# 메시징 — NFR-04: 텔레메트리 10,000 msg/s
+service_bus_sku              = "Premium"
+event_hubs_sku               = "Premium"
+event_hubs_capacity          = 2
+event_hubs_max_capacity      = 8
+delivery_tracking_partitions = 8
+drone_status_partitions      = 16       # ★ 텔레메트리 처리량
+eventhub_retention_days      = 7
+
+# 데이터 — 영역 중복 (REL-01: 가용성 99.9%)
+redis_sku              = "Premium"
+redis_family           = "P"
+redis_capacity         = 1
+cosmos_serverless      = false
+cosmos_max_throughput  = 4000
+storage_replication    = "GRS"
+enable_zone_redundancy = true
+
+# 컴퓨팅 — 최소 2 인스턴스 (단일 인스턴스는 배포 중 다운타임이 생긴다)
+spring_apps_sku      = "S0"
+instances_ingestion  = 2
+instances_workflow   = 2
+instances_delivery   = 2
+instances_package    = 2
+instances_dronesched = 2
+instances_history    = 1
+
+# 관측성 — 샘플링으로 비용을 통제하되 오류는 애플리케이션에서 100% 수집
+log_retention_days        = 90
+trace_sampling_percentage = 10
+monthly_budget_amount     = 2000
+budget_contact_emails     = ["kyong94@example.com"]

@@ -1,0 +1,67 @@
+# 복원력 구성 — 설계/03_서비스간_통신_설계서.md §4
+#
+# 재시도 · 회로 차단기 · 격벽의 «수치»는 근거가 있어야 한다.
+# 근거 없는 3회·30초는 «해 봤더니 되더라」이지 설계가 아니다.
+
+resilience4j:
+  retry:
+    configs:
+      internal:                       # 내부 서비스 공통
+        maxAttempts: 3
+        waitDuration: 200ms
+        exponentialBackoffMultiplier: 2       # 200ms → 400ms → 800ms
+        randomizedWaitFactor: 0.5             # ★ 지터 — 없으면 모든 인스턴스가 동시에 재시도
+        retryExceptions:
+          - java.io.IOException
+          - org.springframework.web.client.HttpServerErrorException      # 5xx 만
+          - org.springframework.web.client.ResourceAccessException
+        ignoreExceptions:
+          - org.springframework.web.client.HttpClientErrorException      # 4xx 는 재시도 무의미
+    instances:
+      accountService:  { baseConfig: internal, maxAttempts: 2 }
+      packageService:  { baseConfig: internal, maxAttempts: 2 }
+      droneService:    { baseConfig: internal, maxAttempts: 3 }   # 경합 재시도 여유
+      deliveryService: { baseConfig: internal, maxAttempts: 2 }
+
+  circuitbreaker:
+    configs:
+      internal:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 20
+        minimumNumberOfCalls: 10
+        failureRateThreshold: 50                    # 내부 서비스 — 50%
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 3
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+    instances:
+      accountService:  { baseConfig: internal, failureRateThreshold: 60, waitDurationInOpenState: 20s }
+      packageService:  { baseConfig: internal }
+      droneService:    { baseConfig: internal }
+      deliveryService: { baseConfig: internal }
+      thirdParty:                                   # ★ 외부 — 더 빨리, 더 오래 닫는다
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 10
+        minimumNumberOfCalls: 5
+        failureRateThreshold: 30                    # 외부는 장애가 오래 간다 → 빨리 차단
+        waitDurationInOpenState: 60s
+        permittedNumberOfCallsInHalfOpenState: 2
+
+  bulkhead:
+    instances:
+      accountService:  { maxConcurrentCalls: 10, maxWaitDuration: 100ms }
+      packageService:  { maxConcurrentCalls: 20, maxWaitDuration: 100ms }
+      droneService:    { maxConcurrentCalls: 30, maxWaitDuration: 100ms }
+      deliveryService: { maxConcurrentCalls: 20, maxWaitDuration: 100ms }
+      thirdParty:      { maxConcurrentCalls: 10, maxWaitDuration: 0 }   # ★ 대기 없이 즉시 거부
+
+drone:
+  saga:
+    timeout-seconds: 300              # Saga 5분 초과 시 Supervisor 개입
+  supervisor:
+    scan-interval-ms: 30000           # 30초마다 스캔
+  services:
+    account:    http://account-service
+    package:    http://package-service
+    drone:      http://drone-service
+    delivery:   http://delivery-service
+    thirdparty: https://api.thirdparty-transport.example

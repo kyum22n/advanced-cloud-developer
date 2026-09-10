@@ -91,6 +91,34 @@ Add-V 'Container Insights 사용' ([bool]$mon) '로그·컨테이너 지표 수�
 # ── 엔드포인트 ──────────────────────────────────────────
 if ($base) { foreach ($ep in @('/healthz','/readyz','/version')) { Add-V ("엔드포인트 " + $ep) (Test-HttpOk -Url ($base + $ep)) ($base + $ep) } }
 
+# ── 앱 수준 아이덴티티 (/version 응답으로 "적용했다"가 아니라 "작동한다"를 다시 한번 확인) ──
+if ($base) {
+    $verRaw = $null
+    try { $verRaw = Invoke-WebRequest -Uri ($base + '/version') -UseBasicParsing -TimeoutSec 10 } catch { }
+    if ($verRaw) {
+        $verBody = $verRaw.Content
+        $verJson = $null
+        try { $verJson = $verBody | ConvertFrom-Json } catch { }
+
+        # 앱 스스로도 워크로드 ID를 인지하고 있는가(클러스터 측 뿐 아니라 프로세스 안에서도)
+        Add-V '/version: 앱이 워크로드 ID를 인지함' ($verJson -and $verJson.identity.workloadIdentity -eq $true) `
+            ("workloadIdentity=" + $(if($verJson){$verJson.identity.workloadIdentity}else{'응답 없음'}))
+
+        # GITHUB_TOKEN/NOTION_TOKEN이 env 또는 keyvault 중 하나로는 조달되고 있는가(둘 다 unset이면 설정 누락)
+        $srcOk = $verJson -and $verJson.identity.sources.GITHUB_TOKEN -ne 'unset' -and $verJson.identity.sources.NOTION_TOKEN -ne 'unset'
+        Add-V '/version: 비밀 출처(env|keyvault)가 확인됨' $srcOk `
+            ("sources=" + $(if($verJson){$verJson.identity.sources | ConvertTo-Json -Compress}else{'응답 없음'}))
+
+        # 응답 본문 어디에도 토큰류 문자열이 그대로 실려 있지 않아야 한다(값 유출 방지의 최종 방어선)
+        $leaked = $verBody -match 'ghp_[A-Za-z0-9]{10,}|github_pat_[A-Za-z0-9_]{10,}|ntn_[A-Za-z0-9]{10,}|secret_[A-Za-z0-9]{10,}'
+        Add-V '/version 응답에 자격 증명 값이 없음' (-not $leaked) 'ghp_/ntn_/secret_ 패턴 미검출'
+    } else {
+        Add-V '/version: 앱이 워크로드 ID를 인지함' $false '응답 없음(엔드포인트 점검 항목 참고)'
+        Add-V '/version: 비밀 출처(env|keyvault)가 확인됨' $false '응답 없음'
+        Add-V '/version 응답에 자격 증명 값이 없음' $false '응답 없음'
+    }
+}
+
 # ── 롤백 가능성 ─────────────────────────────────────────
 $hist = kubectl rollout history deploy/$($cfg.app.name) -n $ns 2>$null
 Add-V '롤백 가능(리비전 이력 2개 이상)' (($hist -split "`n" | Where-Object { $_ -match '^\d' }).Count -ge 2) '이전 리비전으로 즉시 복귀 가능'

@@ -1,0 +1,231 @@
+<!-- Slide number: 1 -->
+Advanced Cloud Developer 심화 과정 · 3차시 실습 결과보고
+
+레포 인사이트
+GitHub 레포 분석 → Notion 포트폴리오 자동화 도구
+성명
+
+<!-- Slide number: 2 -->
+
+![What does Microsoft's largest datacenter look like? - OpenSistemas](Picture2.jpg)
+# 1. 프로젝트 개요
+
+<!-- Slide number: 3 -->
+1. 프로젝트 개요
+1-1. 주제 확정 — 레포 인사이트
+누가: 자신이 만든 GitHub 공개 레포를 이력서·포트폴리오에 정리해야 하는 개발자가
+무엇을: 레포 URL 하나만 입력하면 구조·기술스택·커밋 히스토리를 자동 분석해 리포트를 만들고, 확인 후 버튼 클릭으로 Notion 포트폴리오 페이지에 업로드하는 도구를
+왜: 레포를 직접 열어 구조·README·커밋·언어 비율을 눈으로 훑고 손으로 정리하는 반복 작업을 줄이기 위해 만든다.
+20~30분 → 5분
+레포 1건당 정리 소요시간 절감 목표
+약 80%+
+시간 절감률 가설
+5~10건
+이직·이력서 갱신 시기당 정리 레포 수
+•  데이터 소스: (b) 공개 데이터 수집 — GitHub REST API(메타데이터·구조·커밋·언어·README)
+•  산출물 형태: 리포트 문서(Markdown) + 화면(입력/실행/미리보기/이력) 둘 다
+•  민감 데이터 아님 — 커밋 작성자 이메일 등은 마스킹 처리
+
+<!-- Slide number: 4 -->
+
+![What does Microsoft's largest datacenter look like? - OpenSistemas](Picture2.jpg)
+# 2. 개발 환경 및 요구사항 분석
+
+<!-- Slide number: 5 -->
+2. 개발 환경 및 요구사항 분석
+2-1. 환경 점검
+| 항목 | 기대값 | 실제값 / 조치 | 결과 |
+| --- | --- | --- | --- |
+| Node.js | 설치됨 | v24.19.0 (npm 11.17.0) | O |
+| Docker Desktop | 실행 중 | 엔진 중지 → 사용자 승인 후 기동 확인 | O |
+| k3d | 설치·정상 | v5.9.0, 기존 클러스터 k3d-myapp-dev 재기동 확인 | O |
+| MCP 4종 | 등록됨 | filesystem·context7·Sequential Thinking·Playwright 신규 등록 | O |
+| xlsx 생성 수단 | 가능 | Claude Code 내장 xlsx Skill 사용(설치 불필요) | O |
+•  종합 판단: 최종 X(미해결) 항목 없음 — 세션 시작 시 발견된 두 이슈(Docker 엔진 중지, MCP 미등록)는 사용자 승인 후 모두 해결
+•  1차시 산출물(F4_Database_선택가이드.md 등) 재활용 가능성 확인 — 최종 재활용 여부는 주제 확정 후 판단
+
+<!-- Slide number: 6 -->
+2. 개발 환경 및 요구사항 분석
+2-2. 앱기획 스펙 (1/2) — 사용자 스토리 · MVP
+| # | 사용자 스토리 | KPI |
+| --- | --- | --- |
+| US1 | GitHub 레포 URL 입력 → 구조·기술스택·커밋 요약 리포트 자동 수신 | 분석 1건: 20~30분 → 5분 이내 |
+| US2 | 생성된 리포트를 별도 복사 없이 Notion에 바로 저장 | 업로드 원클릭, 수동 복사 0회 |
+| US3 | 과거 분석 이력을 재조회해 포트폴리오 갱신 시 재사용 | 이력 재조회 100% 가능 |
+필수(MVP): URL 입력→분석→미리보기→Notion 업로드 · SQLite 영속 저장 · 입력검증 · 감사로그(누가·언제·무엇) · 개인정보 마스킹 · 역할 스위치(관리자/일반, 서버 측 403 차단)
+나중(Post-MVP): 다중 사용자 인증(OAuth) · 정기 배치 재분석 · 레포 간 비교 · Slack 연동
+
+<!-- Slide number: 7 -->
+2. 개발 환경 및 요구사항 분석
+2-2. 앱기획 스펙 (2/2) — 인수조건 · 오픈소스 후보
+| AC | 구분 | 내용 |
+| --- | --- | --- |
+| AC1 | 정상 | 유효 레포 URL → 분석 실행 → 리포트 화면 표시 |
+| AC2 | 정상 | 리포트 확인 후 Notion 업로드 → 페이지 링크 표시 |
+| AC3 | 정상 | 이력 목록에서 과거 분석 재조회 |
+| AC4 | 예외 | 비공개/미존재 레포 → 안내 후 리포트 미생성 |
+| AC5 | 예외 | GitHub Rate Limit 초과 → 재시도 가능 시각 안내 |
+| AC6 | 예외 | Notion 토큰 미설정/만료 → 오류 안내, 토큰값 비노출 |
+GitHub 연동: @octokit/rest (MIT)
+Notion 연동: @notionhq/client (MIT)
+서버: Express (MIT)
+저장소: better-sqlite3 (MIT)
+리포트 생성: Markdown 템플릿 문자열(별도 변환 불필요)
+
+<!-- Slide number: 8 -->
+
+![What does Microsoft's largest datacenter look like? - OpenSistemas](Picture2.jpg)
+# 3. 앱 설계
+
+<!-- Slide number: 9 -->
+3. 앱 설계
+3-1. 전체 아키텍처 (프론트엔드 / DB / 백엔드 / 배포)
+
+![architecture.png](Picture117.jpg)
+
+<!-- Slide number: 10 -->
+3. 앱 설계
+3-2. 화면 설계 (1/2) — 화면 목록 · 흐름도
+메인(분석 실행): 레포 URL 입력 → 분석 실행
+결과 미리보기: 프로젝트 주제·구조·아키텍처 추정·기술스택 구성비(막대그래프)·커밋 요약, Notion 업로드 버튼
+이력 목록: 과거 분석 이력 테이블, 상세 재조회
+예외 화면: 비공개/존재하지 않는 레포, Rate Limit 초과, Notion 업로드 실패 안내
+
+![screenflow.png](Picture118.jpg)
+
+<!-- Slide number: 11 -->
+3. 앱 설계
+3-2. 화면 설계 (2/2) — 실제 실행 화면
+
+![dev_최종점검_01_초기화면.png](Picture117.jpg)
+
+![dev_최종점검_02_분석결과.png](Picture119.jpg)
+
+![05_이력목록.png](Picture121.jpg)
+① 초기 화면
+② 결과 미리보기
+③ 이력 목록
+
+<!-- Slide number: 12 -->
+3. 앱 설계
+3-3. 데이터 모델 (ERD)
+
+![erd.png](Picture117.jpg)
+
+<!-- Slide number: 13 -->
+3. 앱 설계
+3-4. 백엔드 — API 명세
+| 메서드 | 경로 | 설명 | 상태코드 |
+| --- | --- | --- | --- |
+| POST | /api/analyze | 레포 URL 분석 실행 | 200/400/404/429 |
+| GET | /api/analyses | 분석 이력 목록 조회 | 200 |
+| GET | /api/analyses/:id | 분석 상세 + 리포트 조회 | 200/404 |
+| POST | /api/analyses/:id/notion-upload | Notion 페이지 업로드(수동 트리거) | 200/401/403/502 |
+| DELETE | /api/analyses/:id | 이력 삭제 (관리자 전용) | 200/403/404 |
+•  Notion 업로드는 분석 완료 시 자동 실행되지 않고, 사용자가 결과를 확인한 뒤 버튼을 클릭해야 실행되는 수동 트리거입니다.
+•  DELETE는 ?role=admin 이 아니면 서버가 실제로 403을 반환해 차단합니다 (단순 UI 숨김이 아닌 서버 측 접근 제어).
+
+<!-- Slide number: 14 -->
+3. 앱 설계
+3-4. 백엔드 — 시퀀스 다이어그램
+
+![sequence.png](Picture117.jpg)
+레포 URL 입력 → 분석 → 리포트 생성 → Notion 업로드(수동 트리거)
+
+<!-- Slide number: 15 -->
+
+![What does Microsoft's largest datacenter look like? - OpenSistemas](Picture2.jpg)
+# 4. 테스트 결과
+
+<!-- Slide number: 16 -->
+4. 테스트 결과
+4. 테스트 결과 — 인수조건 6/6 커버리지
+| AC-ID | 내용 | 커버 TC | 결과 |
+| --- | --- | --- | --- |
+| AC1 | 정상: 분석 실행 → 리포트 표시 | 7 | O |
+| AC2 | 정상: Notion 업로드 → 페이지 링크 | 2 | O |
+| AC3 | 정상: 이력 재조회 | 3 | O |
+| AC4 | 예외: 비공개/미존재/형식오류 | 4 | O |
+| AC5 | 예외: Rate Limit 초과 | 1 | O |
+| AC6 | 예외: Notion 토큰 미설정 | 2 | O |
+19건 / 19건
+단위 5·통합 7·E2E 7 전부 Pass
+6 / 6
+인수조건(AC) 전체 커버리지
+•  실제 공개 레포 18건 이상으로 검증, Rate Limit·Notion 토큰 미설정 예외도 실제 재현
+
+![notion_success_07.png](Picture121.jpg)
+실제 Notion 업로드 성공 화면(레포 분석 예시)
+
+<!-- Slide number: 17 -->
+
+![What does Microsoft's largest datacenter look like? - OpenSistemas](Picture2.jpg)
+# 5. 배포
+
+<!-- Slide number: 18 -->
+5. 배포
+5-1. 발생한 문제 (stg/prd 실배포 중)
+| # | 문제 | 원인 |
+| --- | --- | --- |
+| 1 | stg 통합테스트 실패 — 방금 쓴 값을 못 찾음 | SQLite가 파드 로컬 파일인데 replicas=2라 LB가 요청을 다른 파드로 분산 |
+| 2 | prd env.prd.json이 PostgreSQL·Redis·Storage를 생성하도록 설정 | myapp은 better-sqlite3+API만 사용 — 설계-구현 불일치 |
+| 3 | Key Vault 비밀 저장 실패에도 스크립트가 '성공'으로 표시 | RBAC 쓰기 역할 누락 + 종료 코드 미확인 |
+| 4 | AKS 사용자 노드풀 생성 시 vCPU 쿼터 소진 | 리전 쿼터가 stg+prd 시스템풀로 이미 소진(구독 하드 제약) |
+| 5 | Argo CD CRD 설치 실패 (262144바이트 주석 한도) | prd가 client-side apply 사용 — stg에서 이미 고친 버그가 미반영 |
+•  dev에서만 검증하고 stg·prd를 '설계상 되어 있다'로 넘겼다면 이 중 다수를 발견하지 못했을 것 — 실제 실행이 유일한 검증 수단
+
+<!-- Slide number: 19 -->
+5. 배포
+5-2. 해결 방법
+| # | 대응 | 결과 |
+| --- | --- | --- |
+| 1 | replicas를 1로 임시 조정→통합/E2E 통과 확인→2로 원복 후 selfHeal 검증 | 통합테스트 Pass(우회) · selfHeal 10초 내 자동 복구 실측 |
+| 2 | skipPaasData: true 로 불필요한 PaaS 리소스 생성 자체를 생략 | 비용 절감, Key Vault·ACR·AKS만 생성 |
+| 3 | 로그인 계정에 Key Vault Secrets Officer 부여 + 실패 시 예외 처리 | 비밀 3종 저장 확인 |
+| 4 | 사용자 노드풀 없이 시스템 노드풀에 워크로드 배포로 전환 | 우회 성공(운영 모범사례는 쿼터 증설 후 원복 필요) |
+| 5 | --server-side --force-conflicts 로 통일 | 해결 |
+•  핵심 교훈: 근본 해결(공유 스토리지 전환 등)은 이번 범위 밖 — 우회는 임시 조치임을 설계 문서에 명시해 후속 작업으로 남김
+
+<!-- Slide number: 20 -->
+
+![What does Microsoft's largest datacenter look like? - OpenSistemas](Picture2.jpg)
+# 6. 과정 회고
+
+<!-- Slide number: 21 -->
+6. 과정 회고
+6. 과정 회고 — 현업 적용 & 다음 학습
+반복 조사 업무 자동화 패턴 확산: 'URL 입력→자동 리포트→협업툴 업로드' — 건당 20~30분→5분(약 80% 절감), 출처(URL·시각) 자동 기록으로 감사 추적성 확보 (ROI 높음·난이도 낮음)
+비밀 없는 접근 전면 적용: Key Vault + 워크로드 ID로 토큰 유출 가능성을 구조적으로 낮춤 (ROI 높음·난이도 중간)
+배포 파이프라인 표준 템플릿화: 10~90단계 스크립트 + 80_verify 자동 검증을 팀 표준으로 (ROI 중간·난이도 중간)
+•  다중 레플리카에서도 정합성이 유지되는 데이터 계층(PostgreSQL/PVC 공유 스토리지)으로 전환
+•  GitHub/Notion 같은 서드파티 SaaS의 비밀 최소화 대안(OAuth App 등) 조사
+•  GitOps selfHeal의 '의도된 긴급 변경' vs '실수'를 구분하는 운영 절차 학습
+
+<!-- Slide number: 22 -->
+
+![What does Microsoft's largest datacenter look like? - OpenSistemas](Picture2.jpg)
+# 7. 시연
+
+<!-- Slide number: 23 -->
+7. 시연
+7. 시연 — 3분 임원 시연 시나리오
+| 순서 | 클릭 / 화면 | 강조할 KPI |
+| --- | --- | --- |
+| 1 (30초) | 메인 화면, 레포 URL 입력 | URL 하나만 넣으면 끝 |
+| 2 (60초) | 분석 실행 → 결과 미리보기 | 20~30분 조사가 수십 초로 단축 |
+| 3 (30초) | 생성된 Markdown 리포트 확인 | 출처(URL·SHA·시각) 자동 기록 |
+| 4 (30초) | Notion에 업로드 → 완료 링크 | 복사 없이 팀 공유 문서로 전환 |
+| 5 (30초) | 이력 목록 → 과거 이력 재조회 | 과거 분석도 언제든 재조회 |
+실행 화면 시연 영상
+dev 환경(k3d, http://localhost:8080)에서 실제로 실행한 화면을 순서대로 재생하는 시연 자료입니다.
+URL: https://claude.ai/code/artifact/ae150cfb-eb10-4623-bc3f-d29b2a36d075
+
+![notion_success_dev03.png](Picture119.jpg)
+•  실측: dev run_all.ps1 8단계(10 전제조건 ~ 80 검증) 전부 Pass, stg(AKS+Argo CD) 재현 배포도 검증 완료
+dev 환경 실제 업로드 완료 화면
+
+<!-- Slide number: 24 -->
+
+![](그림1.jpg)
+
+### Notes:

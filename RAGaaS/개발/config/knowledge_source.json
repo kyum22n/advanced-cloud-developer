@@ -1,0 +1,9 @@
+{
+  "name": "hr-ga-knowledge-source",
+  "kind": "searchIndex",
+  "description": "누리컴퍼니 인사·총무 지식 베이스. 인사(채용·평가·휴가·급여·퇴직)와 총무(비품·출장·경비·계약·복리후생) 규정·지침·FAQ·문의이력·공지를 포함한다.",
+  "searchIndexParameters": {
+    "searchIndexName": "hr-ga-chunks",
+    "sourceDataSelect": "chunk_id,parent_id,title,content,category,subcategory,doc_type,status,effective_date,source_uri,security_level"
+  }
+}

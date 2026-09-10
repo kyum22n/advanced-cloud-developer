@@ -1,0 +1,38 @@
+# ── 빌드 산출물
+target/
+build/
+dist/
+*.jar
+*.war
+node_modules/
+
+# ── IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# ── OS
+.DS_Store
+Thumbs.db
+
+# ── ⛔ 비밀 — 절대 커밋하지 않는다
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+local-settings.json
+appsettings.Development.json
+**/secrets/
+
+# ── Terraform (구축/ 폴더)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log

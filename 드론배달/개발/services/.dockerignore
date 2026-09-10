@@ -1,0 +1,15 @@
+# 빌드 산출물 — 컨테이너 안에서 새로 빌드하므로 넣지 않는다
+**/target/
+**/*.jar
+
+# IDE · OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# 비밀이 들어갈 수 있는 것 — 이미지에 절대 넣지 않는다
+**/.env
+**/*.pem
+**/*.key
+**/local-settings.*

@@ -1,0 +1,21 @@
+sequenceDiagram
+    participant U as 사용자
+    participant S as 서버(Express)
+    participant G as GitHub API
+    participant D as SQLite
+    participant N as Notion API
+
+    U->>S: POST /api/analyze { repoUrl }
+    S->>S: URL 파싱·검증
+    S->>G: GET /repos/{owner}/{repo}
+    G-->>S: 메타데이터 (or 404)
+    S->>G: GET /commits, /languages, /readme
+    G-->>S: 커밋·언어 데이터
+    S->>S: 리포트(Markdown) 생성 + 마스킹 처리
+    S->>D: 분석 결과·리포트 저장 + 감사로그 기록
+    S-->>U: 결과 미리보기 반환
+    U->>S: POST /api/analyses/:id/notion-upload
+    S->>N: POST /pages (parent, content)
+    N-->>S: 페이지 URL (or 401/403)
+    S->>D: notion_url 업데이트 + 감사로그 기록
+    S-->>U: 업로드 완료 + 페이지 링크

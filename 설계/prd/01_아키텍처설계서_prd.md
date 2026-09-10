@@ -4,6 +4,8 @@
 > **최우선 품질 속성**: **가용성 · 보안 · 관측성 · 복구** > 성능 > 비용 > 반복 속도
 > **정본**: 이 문서의 모든 값은 [`배포/prd/config/env.prd.json`](../../배포/prd/config/env.prd.json) 및 `config/k8s/base/*.yaml` 과 일치합니다.
 
+> ⚠️ **myapp(레포 인사이트) 적용 현황 (2026-08-29 실배포 기준)** — 아래 §2~§10은 이 플랫폼이 지원하는 **목표(설계) 아키텍처**를 기술합니다. 실제 myapp은 `better-sqlite3`(파일 DB)와 GitHub/Notion API만 쓰고 `pg`/`redis`/Blob 클라이언트가 없어 **PostgreSQL·Redis·Storage를 실제로 쓰지 않습니다**. `env.prd.json`의 `skipPaasData: true`로 이 세 리소스는 **생성 자체를 생략**했고, Key Vault·ACR·AKS(시스템 노드풀)만 생성했습니다. 또 노드풀은 koreacentral 리전 vCPU 쿼터 소진으로 **별도 사용자 노드풀 없이 시스템 노드풀에 워크로드를 배포**했습니다(ADR-P-02의 목표 상태와 다른 임시 상태 — 쿼터 확보 후 원복 필요). PostgreSQL·Redis·Storage 관련 서술(§5-1-1, §6, §9의 4단계, ADR-P-04·05·12 등)은 이 앱에는 **N/A**이며, 향후 이 플랫폼으로 실제 PaaS 데이터를 쓰는 앱을 배포할 때 유효합니다. 상세 근거: [`실습산출물/3차시/11_최종검토_대조.md`](../../실습산출물/3차시/11_최종검토_대조.md) §4단계.
+
 ---
 
 ## 1. 설계 목표와 비목표
@@ -173,6 +175,8 @@ sequenceDiagram
 | 토큰이 **짧고 자동 갱신** | 탈취되어도 유효 기간 제한 |
 | Key Vault 감사 로그 | 누가 언제 조회했는지 추적 |
 
+> ⚠️ **myapp 실제 시크릿은 위 4종(db-host/db-user/db-password/redis-host)이 아니라 `github-token`·`notion-token`·`notion-parent-page-id` 3종입니다** — myapp이 PostgreSQL/Redis를 쓰지 않기 때문(§0 안내 참고). CSI·워크로드 ID 메커니즘 자체는 이 3종에 동일하게 적용되어 2026-08-29 실배포에서 정상 동작을 확인했습니다.
+
 ### 5-1-1. 데이터 계층까지 «비밀 없이» — 적용 범위
 
 | 리소스 | 이전 | **적용 후** | 부여 역할 |
@@ -201,11 +205,11 @@ sequenceDiagram
 | 런타임 | seccomp | `seccompProfile: RuntimeDefault` | – |
 | 신원 | 워크로드 ID | SA 주석 + 연합 자격 증명 | ✅ P-05 |
 | 네트워크 | **앱을 인터넷에 직접 두지 않음** | **내부 LB** + Ingress | – |
-| 네트워크 | **DB 공용 액세스 차단** | `publicNetworkAccess=Disabled` · snet-data | ✅ P-08 |
-| 데이터 | 전송 암호화 | `DB_SSL=true` | – |
-| 데이터 | HA · 백업 | ZoneRedundant · 14일 | ✅ P-09·P-10 |
-| 신원 | **워크로드 ID 토큰 주입** | 웹훅이 파드에 환경 변수·토큰 파일 주입 | ✅ P-21 |
-| 신원 | **PostgreSQL Entra 인증** | `activeDirectoryAuth = Enabled` | ✅ P-22 |
+| 네트워크 | **DB 공용 액세스 차단** | `publicNetworkAccess=Disabled` · snet-data | **N/A**(myapp 미사용, §0) |
+| 데이터 | 전송 암호화 | `DB_SSL=true` | **N/A**(myapp 미사용) |
+| 데이터 | HA · 백업 | ZoneRedundant · 14일 | **N/A**(myapp 미사용) |
+| 신원 | **워크로드 ID 토큰 주입** | 웹훅이 파드에 환경 변수·토큰 파일 주입 | ✅ P-21(2026-08-29 실측) |
+| 신원 | **PostgreSQL Entra 인증** | `activeDirectoryAuth = Enabled` | **N/A**(myapp 미사용) |
 | 신원 | **최소 권한** | 구독 범위 역할 할당 0건 | ✅ P-23 |
 
 > 🚫 **절대 금지 6가지** — ① `latest` 등 가변 태그 배포 ② 비밀 값을 Git·이미지·ConfigMap 에 기록 ③ DB 공용 액세스 허용 ④ prd 에서 쓰기 스모크 실행 ⑤ **서비스 주체 클라이언트 시크릿 생성** ⑥ **구독 범위 역할 부여**.
@@ -307,7 +311,7 @@ flowchart LR
 | VNet·서브넷 | AKS · DB | 서브넷 위임이 먼저 있어야 함 |
 | Log Analytics | AKS(모니터링 애드온) | 작업 영역 ID 를 참조 |
 | Key Vault · 관리 ID | 역할 할당 | 대상 주체가 있어야 부여 가능 |
-| 데이터 리소스 | Key Vault 비밀 저장 | **호스트 이름이 생성 후에야 정해짐** |
+| 데이터 리소스 | Key Vault 비밀 저장 | **호스트 이름이 생성 후에야 정해짐**(myapp은 4단계 자체를 `skipPaasData`로 생략) |
 | AKS OIDC 발급자 | 연합 자격 증명 | 발급자 URL 필요 |
 
 ---
@@ -317,10 +321,10 @@ flowchart LR
 | ID | 결정 | 대안 | 선택 이유 | 트레이드오프 |
 | --- | --- | --- | --- | --- |
 | **ADR-P-01** | AKS **Standard 계층** | Free | 제어 평면 SLA | 클러스터당 월 요금 |
-| **ADR-P-02** | **시스템(3) / 사용자(2~6) 노드 풀 분리** | 단일 풀 | 앱 부하가 CoreDNS 등 핵심 컴포넌트를 밀어내지 못함 | 노드 수 증가 |
+| **ADR-P-02** | **시스템(3) / 사용자(2~6) 노드 풀 분리** | 단일 풀 | 앱 부하가 CoreDNS 등 핵심 컴포넌트를 밀어내지 못함 | 노드 수 증가 — ⚠️ 2026-08-29 실배포는 koreacentral vCPU 쿼터 소진으로 **사용자 노드 풀 생성 실패, 임시로 시스템 풀에 워크로드 배포**(목표 상태 아님, 쿼터 확보 후 원복 필요) |
 | **ADR-P-03** | **Zone 1/2/3 분산** | 단일 영역 | 영역 장애 생존 | 영역 간 지연·비용 |
-| **ADR-P-04** | **PaaS 데이터 계층**(PostgreSQL·Redis·Storage) | in-cluster | 백업·PITR·HA·패치 위임 · 세션 외부화 | 비용 · 외부 의존 |
-| **ADR-P-05** | **DB 공용 액세스 차단 + 전용 서브넷** | 방화벽 IP 허용 | **IP 목록 관리 자체를 없앰** (노드 증가 시 누락 위험 제거) | 사설 접근 구성 필요 |
+| **ADR-P-04** | **PaaS 데이터 계층**(PostgreSQL·Redis·Storage) | in-cluster | 백업·PITR·HA·패치 위임 · 세션 외부화 | 비용 · 외부 의존 — ⚠️ **myapp은 N/A**(SQLite 사용, `skipPaasData=true`로 미생성) |
+| **ADR-P-05** | **DB 공용 액세스 차단 + 전용 서브넷** | 방화벽 IP 허용 | **IP 목록 관리 자체를 없앰** (노드 증가 시 누락 위험 제거) | 사설 접근 구성 필요 — ⚠️ **myapp은 N/A**(DB 자체 미생성) |
 | **ADR-P-06** | **Key Vault + CSI + 워크로드 ID** | K8s Secret | 비밀·접속 대상이 Git·이미지에 없음 | 초기 설정 복잡도 |
 | **ADR-P-12** | **PostgreSQL·Redis·Storage 를 Entra 인증으로 전환** | 비밀번호·액세스 키를 Key Vault 에 보관 | **비밀을 «만들지 않는다»** — 회전·감사 부담 소멸 | 앱이 토큰을 다뤄야 함 · Entra 전파 지연 |
 | **ADR-P-13** | 앱이 **환경을 보고 인증 방식을 스스로 선택** | 환경별 이미지 분리 | 같은 이미지가 dev·stg·prd 에서 동작(NFR-07) | 선택 로직이 코드에 존재 → 단위 테스트로 고정 |

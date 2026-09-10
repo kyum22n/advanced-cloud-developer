@@ -1,0 +1,79 @@
+# 배달 애그리거트 · 상태 · ETA
+server:
+  port: 8083
+  shutdown: graceful
+  error:
+    include-stacktrace: never          # ★ 내부 정보 노출 금지
+
+spring:
+  application:
+    name: delivery
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  threads:
+    virtual:
+      enabled: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      ssl:
+        enabled: ${REDIS_SSL:false}
+      timeout: 2s
+
+  cloud:
+    azure:
+      credential:
+        # ★ 비밀 없음 — 앱별 사용자 할당 관리 ID (SEC-01)
+        managed-identity-enabled: ${AZURE_MI_ENABLED:false}
+        client-id: ${AZURE_CLIENT_ID:}
+      eventhubs:
+        namespace: ${EVENTHUB_NAMESPACE:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: ${HEALTH_DETAILS:never}
+  metrics:
+    tags:
+      service: delivery
+      env: ${ENVIRONMENT:local}
+  tracing:
+    sampling:
+      probability: ${TRACE_SAMPLING:1.0}
+
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:true}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:true}
+    path: /swagger-ui.html
+
+logging:
+  level:
+    root: INFO
+    com.fabrikam: ${LOG_LEVEL:INFO}
+  pattern:
+    console: '{"timestamp":"%d{yyyy-MM-dd HH:mm:ss.SSS}","level":"%level","service":"delivery","correlationId":"%X{correlationId:-}","deliveryId":"%X{deliveryId:-}","logger":"%logger{36}","message":"%msg"}%n'
+
+---
+# ── 운영 프로파일 — 노출 최소화 (SEC-15 · SEC-16)
+spring:
+  config:
+    activate:
+      on-profile: prd
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+management:
+  endpoint:
+    health:
+      show-details: never

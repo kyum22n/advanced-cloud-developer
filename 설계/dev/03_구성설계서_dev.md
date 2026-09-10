@@ -145,14 +145,16 @@ flowchart LR
 
 ## 6. 설정 변경 시 영향 범위
 
+> myapp(레포 인사이트)은 `db.mode: "embedded-sqlite"` — 별도 DB 서버가 없어, 원래(공통 샘플 앱 기준) 표에 있던 `db.name`/`db.user`/`db.passwordEnvVar` 행은 **myapp 에는 해당 사항이 없습니다.** 대신 `db.secretEnvVars`(`GITHUB_TOKEN`·`NOTION_TOKEN`·`NOTION_PARENT_PAGE_ID`)가 그 자리를 대체합니다. `postgres.yaml` 은 다른 3차시 앱과의 구조 비교용으로만 보존되며 `20_config.ps1` 이 적용하지 않습니다([실습산출물/3차시/06_배포스크립트_조정.md](../../실습산출물/3차시/06_배포스크립트_조정.md) 참고).
+
 | 변경 | 함께 바꿔야 할 것 |
 | --- | --- |
 | `cluster.hostPort` | `test.baseUrl` · (문서의 접속 URL) |
 | `cluster.nodePort` | `app.yaml` 의 `Service.nodePort` |
-| `app.namespace` | `namespace.yaml` · `postgres.yaml` · `app.yaml` 의 모든 `namespace` |
+| `app.namespace` | `namespace.yaml` · `app.yaml` 의 모든 `namespace` |
 | `app.containerPort` | `app.yaml` 의 `containerPort` · 프로브 포트 · Service `targetPort` |
-| `db.name` / `db.user` | ConfigMap(자동) · postgres 초기화(자동) — **기존 DB 가 있으면 재생성 필요** |
-| `db.passwordEnvVar` | 사용자가 설정하는 환경 변수 이름 |
+| `db.secretEnvVars` 항목 추가/삭제 | `20_config.ps1` 의 Secret 생성 로직 · `myapp/src/secrets.js` 의 `resolveSecretSource()` 대상 목록 · [공통 03 §2](../공통/03_REST_API_설계서.md) `/api/env-status` 응답 필드 |
+| `GITHUB_TOKEN`/`NOTION_TOKEN`/`NOTION_PARENT_PAGE_ID` 환경 변수(호스트 셸) | `20_config.ps1` 재실행 필요(Secret 갱신) — 값이 없어도 앱은 "미설정"으로 정상 동작(기능만 축소) |
 
 ---
 

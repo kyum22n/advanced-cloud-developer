@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>레포 분석 · 예외 화면</title>
+<link rel="stylesheet" href="common.css">
+</head>
+<body>
+<header>
+  <div class="title">📦 레포 인사이트 · GitHub → Notion 리포트 도구</div>
+  <nav>
+    <a href="index.html">분석 실행</a>
+    <a href="history.html">이력 목록</a>
+    <a href="error.html" class="active">예외 화면 예시</a>
+  </nav>
+</header>
+<main>
+  <div class="card">
+    <h2>예외 상황 안내 (AC4 · AC5 · AC6 대응 화면 예시)</h2>
+
+    <div class="error-box" style="margin-bottom:16px;">
+      <h3>⚠ 비공개 레포이거나 존재하지 않는 레포입니다</h3>
+      <p>입력하신 URL: <code>https://github.com/my-org/private-tool</code></p>
+      <p>GitHub API 응답: <code>404 Not Found</code> — 공개(public) 레포만 분석할 수 있습니다.</p>
+    </div>
+
+    <div class="error-box" style="margin-bottom:16px;">
+      <h3>⚠ GitHub API 호출 한도를 초과했습니다</h3>
+      <p>GitHub API 응답: <code>403 Forbidden (rate limit exceeded)</code></p>
+      <p>한도 초기화 예정 시각(UTC): 2026-08-28 07:00 이후 다시 시도해 주세요.</p>
+    </div>
+
+    <div class="error-box">
+      <h3>⚠ Notion 업로드에 실패했습니다</h3>
+      <p>Notion API 응답: <code>401 Unauthorized</code></p>
+      <p>.env의 <code>NOTION_TOKEN</code> 설정을 확인해 주세요. (토큰 값 자체는 표시되지 않습니다)</p>
+      <p class="meta">재시도 방법: .env 값 갱신 후 서버 재시작 → 같은 이력에서 "Notion에 업로드"를 다시 클릭</p>
+    </div>
+  </div>
+  <div class="footer-note">더미 예외 시나리오입니다. 실제 오류 메시지는 API 응답 코드 기반으로 3단계에서 생성됩니다.</div>
+</main>
+</body>
+</html>

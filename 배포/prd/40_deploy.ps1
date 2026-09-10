@@ -27,7 +27,7 @@ Write-Info ("승격 대상 이미지: {0}/{1}:{2}" -f $b.registry, $b.repository
 if (-not (Confirm-Destructive -Target ("운영 배포 (태그 " + $b.tag + ")") -Force:$Force)) { exit 0 }
 
 Write-Step "1/4 매니페스트 치환 (Key Vault·워크로드 ID·테넌트)"
-foreach ($f in @('base\serviceaccount.yaml','base\secretprovider.yaml')) {
+foreach ($f in @('base\serviceaccount.yaml','base\secretprovider.yaml','base\configmap.yaml')) {
     $p = Join-Path "$PSScriptRoot\config\k8s" $f
     $t = Get-Content $p -Raw -Encoding UTF8
     $t = $t.Replace('CLIENT_ID_PLACEHOLDER', $st.clientId)
@@ -62,12 +62,19 @@ $ans = $cfg.argocd.namespace
 kubectl create namespace $ans --dry-run=client -o yaml | kubectl apply -f -
 if (-not (kubectl get deploy argocd-server -n $ans -o name 2>$null)) {
     Invoke-Checked -What 'argocd 설치' -Script {
-        kubectl apply -n $ans -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+        kubectl apply --server-side --force-conflicts -n $ans -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
     }
     Invoke-Checked -What 'argocd 준비 대기' -Script { kubectl rollout status deploy/argocd-server -n $ans --timeout=420s }
 }
+$projYaml = Get-Content "$PSScriptRoot\config\argocd\project.yaml" -Raw -Encoding UTF8
+$projYaml = $projYaml.Replace('REPO_URL_PLACEHOLDER', $cfg.argocd.repoUrl)
+$projTmp = Join-Path $env:TEMP 'argocd-project-prd.yaml'
+$projYaml | Out-File $projTmp -Encoding utf8
+Invoke-Checked -What 'AppProject 적용' -Script { kubectl apply -f $projTmp }
+
 $appYaml = Get-Content "$PSScriptRoot\config\argocd\application.yaml" -Raw -Encoding UTF8
 $appYaml = $appYaml.Replace('REPO_URL_PLACEHOLDER', $cfg.argocd.repoUrl)
+$appYaml = $appYaml.Replace('TARGET_REVISION_PLACEHOLDER', $cfg.argocd.targetRevision)
 $tmp = Join-Path $env:TEMP 'argocd-app-prd.yaml'
 $appYaml | Out-File $tmp -Encoding utf8
 Invoke-Checked -What 'Application 적용' -Script { kubectl apply -f $tmp }
@@ -86,6 +93,9 @@ if ($hasRemote) {
     Invoke-Checked -What 'kustomize 적용' -Script { kubectl apply -k "$PSScriptRoot\config\k8s\overlays\prd" }
 }
 
+Wait-Condition -What 'Argo CD 동기화로 네임스페이스 생성' -TimeoutSec 180 -IntervalSec 10 -Condition {
+    kubectl get namespace $($cfg.app.namespace) -o name 2>$null
+}
 Invoke-Checked -What '롤아웃 대기(무중단)' -Script {
     kubectl rollout status deploy/$($cfg.app.name) -n $($cfg.app.namespace) --timeout=600s
 }

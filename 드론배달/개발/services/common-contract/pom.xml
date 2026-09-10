@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.fabrikam.drone</groupId>
+    <artifactId>drone-delivery-parent</artifactId>
+    <version>1.0.0</version>
+  </parent>
+
+  <artifactId>common-contract</artifactId>
+  <name>common-contract</name>
+  <description>서비스 간 «게시된 언어» — 값 개체와 도메인 이벤트 스키마</description>
+
+  <!--
+    ⚠️ 이 모듈에 들어가도 되는 것 / 들어가면 안 되는 것
+
+      ✅ 서비스 간 계약에 등장하는 값 개체 (Location · Eta · PackageWeight …)
+      ✅ 도메인 이벤트 봉투와 페이로드 (게시된 언어)
+      ✅ 오류 코드 · 헤더 이름 등 규약 상수
+
+      ❌ 애그리거트 (Delivery · Drone · Package)  ← 각 서비스가 소유한다
+      ❌ 비즈니스 규칙 · 불변식
+      ❌ 리포지토리 · 서비스
+
+    애그리거트를 여기에 넣으면 서비스가 «공유 도메인 모델»로 묶여
+    독립 배포가 불가능해진다. 그것이 분산된 단일체다.
+  -->
+
+  <dependencies>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.datatype</groupId>
+      <artifactId>jackson-datatype-jsr310</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>jakarta.validation</groupId>
+      <artifactId>jakarta.validation-api</artifactId>
+    </dependency>
+  </dependencies>
+</project>

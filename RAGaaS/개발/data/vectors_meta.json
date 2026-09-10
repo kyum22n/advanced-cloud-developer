@@ -1,0 +1,10 @@
+{
+  "backend": "local-lsa",
+  "dim": 256,
+  "vocab": 6180,
+  "count": 12863,
+  "shape": [
+    12863,
+    256
+  ]
+}

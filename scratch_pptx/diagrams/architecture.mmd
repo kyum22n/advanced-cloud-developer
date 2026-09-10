@@ -1,0 +1,37 @@
+flowchart TB
+    subgraph FE["프론트엔드"]
+        UI["정적 HTML/CSS/JS<br/>(메인 · 결과 · 이력 · 예외 화면)"]
+    end
+
+    subgraph BE["백엔드 (Node.js + Express)"]
+        API["REST API<br/>/api/analyze · /api/analyses"]
+        LOGIC["분석 로직<br/>github.js · insights.js · report.js"]
+        AUDIT["감사로그 · 마스킹 처리"]
+    end
+
+    subgraph DATA["데이터"]
+        DB[("SQLite<br/>better-sqlite3<br/>analysis · language_stat · commit_summary · report · audit_log")]
+    end
+
+    subgraph EXT["외부 서비스"]
+        GH["GitHub REST API<br/>(공개 레포 메타데이터·커밋·언어)"]
+        NO["Notion API<br/>(리포트 업로드)"]
+    end
+
+    subgraph DEPLOY["배포 환경"]
+        DEV["dev: k3d(로컬)<br/>docker build → image import"]
+        STG["stg: AKS + Argo CD<br/>(GitOps, selfHeal)"]
+        PRD["prd: AKS + PaaS<br/>(Key Vault·워크로드ID)"]
+    end
+
+    UI -->|fetch| API
+    API --> LOGIC
+    LOGIC --> AUDIT
+    LOGIC <--> DB
+    AUDIT --> DB
+    LOGIC -->|REST| GH
+    LOGIC -->|REST, 수동 트리거| NO
+
+    BE -.컨테이너 이미지.-> DEV
+    DEV -.승격.-> STG
+    STG -.승격.-> PRD

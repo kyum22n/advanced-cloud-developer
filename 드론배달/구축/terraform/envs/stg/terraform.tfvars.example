@@ -1,0 +1,52 @@
+# stg — 검증 환경.
+#
+# ★ stg 의 존재 이유는 «prd 와 같은 구조»를 미리 검증하는 것이다.
+#   그래서 네트워크 구조·보안 설정은 prd 와 동일하게 두고, «규모»만 줄인다.
+#   WAF 는 Detection(감지) 모드로 두어 오탐을 먼저 관찰한다.
+
+subscription_id = "00000000-0000-0000-0000-000000000000"
+owner           = "kyong94@example.com"
+location        = "koreacentral"
+
+# 네트워크 — prd 와 같은 구조, 허브만 없음
+vnet_enabled          = true
+vnet_address_space    = "10.2.0.0/16"
+hub_vnet_id           = null
+public_network_access = false          # ★ prd 와 동일 — 프라이빗 엔드포인트만
+
+# 플랫폼
+acr_sku                    = "Premium"  # 프라이빗 엔드포인트에 필요
+key_vault_purge_protection = false
+
+# 메시징
+service_bus_sku              = "Premium" # 프라이빗 엔드포인트에 필요
+event_hubs_sku               = "Standard"
+event_hubs_capacity          = 1
+event_hubs_max_capacity      = 2
+delivery_tracking_partitions = 4
+drone_status_partitions      = 8
+eventhub_retention_days      = 3
+
+# 데이터
+redis_sku              = "Standard"
+redis_family           = "C"
+redis_capacity         = 1
+cosmos_serverless      = false
+cosmos_max_throughput  = 1000
+storage_replication    = "LRS"
+enable_zone_redundancy = false
+
+# 컴퓨팅 — 2 인스턴스 (단일 인스턴스에서 안 보이는 문제를 잡는다)
+spring_apps_sku      = "S0"
+instances_ingestion  = 2
+instances_workflow   = 1
+instances_delivery   = 2
+instances_package    = 1
+instances_dronesched = 2
+instances_history    = 1
+
+# 관측성
+log_retention_days        = 30
+trace_sampling_percentage = 50
+monthly_budget_amount     = 400
+budget_contact_emails     = ["kyong94@example.com"]

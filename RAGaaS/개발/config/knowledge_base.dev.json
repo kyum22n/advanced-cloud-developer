@@ -1,0 +1,37 @@
+{
+  "name": "hr-ga-knowledge-base",
+  "description": "인사·총무 문의 응대용 에이전트 검색 파이프라인",
+  "knowledgeSources": [
+    {
+      "name": "hr-ga-knowledge-source",
+      "alwaysQuery": true
+    }
+  ],
+  "models": [
+    {
+      "kind": "azureOpenAI",
+      "azureOpenAIParameters": {
+        "resourceUri": "https://{AZURE_OPENAI_RESOURCE}.openai.azure.com",
+        "deploymentId": "{CHAT_DEPLOYMENT}",
+        "modelName": "{CHAT_MODEL}"
+      }
+    }
+  ],
+  "retrievalInstructions": "인사·총무 규정 질의에 답하기 위한 근거를 찾는다.\n규칙:\n1. status 가 '폐지'인 문서는 근거로 쓰지 않는다.    개정 이력을 묻는 질문일 때만 예외로 참고한다.\n2. 같은 주제에 여러 버전이 있으면 effective_date 가 가장 최근인 것을 우선한다.\n3. 숫자(일수·금액·기한)를 묻는 질문은 '규정' 또는 '안내서' 유형을 우선한다.    FAQ 와 문의이력은 요약이라 수치가 다를 수 있다.\n4. 절차를 묻는 질문은 '지침' 또는 '서식안내' 유형을 우선한다.\n5. 여러 조건이 걸린 질문(예: 직급 + 상황 + 제도)은 조건별로 하위 쿼리를 나눈다.\n",
+  "retrievalReasoningEffort": "low",
+  "_설계메모": {
+    "환경": "dev",
+    "추론노력": "low",
+    "추론노력_의미": {
+      "minimal": "LLM 쿼리 계획 생략. 가장 빠르고 싸다. 단순 질의에 적합",
+      "low": "LLM 이 하위 쿼리를 만들고 원본을 고른다 (기본값)",
+      "medium": "반복 단계 추가. 다중 홉에 강하지만 토큰이 크게 는다"
+    },
+    "API버전_주의": "retrievalReasoningEffort 는 2026-05-01-preview 에서 미리 보기다. 운영 도입 전에 2026-04-01 로 GA 되었는지 확인할 것",
+    "비용통제": [
+      "지식 원본 수를 줄이면 팬아웃이 줄어 토큰이 절약된다",
+      "활동 로그로 실제 실행된 하위 쿼리를 확인해 낭비를 찾는다",
+      "단순 질의는 minimal, 복잡 질의만 medium 으로 라우팅하는 것이 이상적"
+    ]
+  }
+}

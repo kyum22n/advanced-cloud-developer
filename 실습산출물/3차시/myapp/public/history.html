@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>레포 분석 · 이력 목록</title>
+<link rel="stylesheet" href="common.css">
+</head>
+<body>
+<header>
+  <div class="title">📦 레포 인사이트 · GitHub → Notion 포트폴리오 리포트 도구</div>
+  <nav>
+    <a href="index.html">분석 실행</a>
+    <a href="history.html" class="active">이력 목록</a>
+  </nav>
+</header>
+<main>
+  <div class="card" id="roleNotice"></div>
+  <div class="card">
+    <h2>분석 이력</h2>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>레포</th><th>수집 시각(UTC)</th><th>HEAD SHA</th><th>상태</th><th>실패사유</th><th>관리</th></tr>
+      </thead>
+      <tbody id="rows"><tr><td colspan="7">불러오는 중...</td></tr></tbody>
+    </table>
+  </div>
+</main>
+<script>
+function esc(s){ return String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+const params = new URLSearchParams(location.search);
+const isAdmin = params.get('role') === 'admin';
+document.getElementById('roleNotice').innerHTML = isAdmin
+  ? '<span class="badge ok">관리자 모드</span> <span class="meta">이력 삭제가 가능합니다.</span>'
+  : '<span class="badge fail">일반 모드</span> <span class="meta">조회·분석만 가능합니다. 관리자 기능은 URL에 <code>?role=admin</code>을 추가하세요.</span>';
+
+function roleQuery() { return isAdmin ? '?role=admin' : ''; }
+
+async function deleteRow(id) {
+  if (!confirm(`이력 #${id}를 삭제할까요? 되돌릴 수 없습니다.`)) return;
+  const res = await fetch(`/api/analyses/${id}${roleQuery()}`, { method: 'DELETE' });
+  const body = await res.json();
+  if (!res.ok) {
+    alert(`삭제 실패(HTTP ${res.status}): ${body.error}`);
+    return;
+  }
+  loadRows();
+}
+
+async function loadRows() {
+  const rows = await fetch('/api/analyses').then(r => r.json());
+  const tbody = document.getElementById('rows');
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7">분석 이력이 없습니다. 먼저 분석을 실행해 주세요.</td></tr>'; return; }
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.id}</td>
+      <td>${esc(r.owner)}/${esc(r.repo)}</td>
+      <td>${esc(r.collected_at)}</td>
+      <td><code>${r.commit_sha ? esc(r.commit_sha.slice(0,7)) : '-'}</code></td>
+      <td><span class="badge ${r.status==='success'?'ok':'fail'}">${esc(r.status)}</span></td>
+      <td>${esc(r.error_reason || '-')}</td>
+      <td>${isAdmin ? `<button class="btn secondary" onclick="deleteRow(${r.id})">삭제</button>` : '<span class="meta">-</span>'}</td>
+    </tr>`).join('');
+}
+loadRows();
+</script>
+</body>
+</html>

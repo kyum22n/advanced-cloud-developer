@@ -1,0 +1,45 @@
+erDiagram
+    ANALYSIS {
+        int id PK
+        string repo_url
+        string owner
+        string repo
+        string default_branch
+        string commit_sha "분석 시점 HEAD SHA"
+        string license "라이선스 미확인 가능"
+        datetime collected_at "수집 시각(UTC)"
+        string status "success/failed"
+        string error_reason
+    }
+    LANGUAGE_STAT {
+        int id PK
+        int analysis_id FK
+        string language
+        int bytes
+        float ratio
+    }
+    COMMIT_SUMMARY {
+        int id PK
+        int analysis_id FK
+        string sha
+        string message_short
+        date committed_at
+    }
+    REPORT {
+        int id PK
+        int analysis_id FK
+        text content_md "구조(디렉터리 트리) 요약 포함"
+        string notion_page_id
+        string notion_url
+        datetime uploaded_at
+    }
+    AUDIT_LOG {
+        int id PK
+        datetime at
+        string actor_role "admin/user"
+        string action
+        string result
+    }
+    ANALYSIS ||--o{ LANGUAGE_STAT : has
+    ANALYSIS ||--o{ COMMIT_SUMMARY : has
+    ANALYSIS ||--|| REPORT : produces

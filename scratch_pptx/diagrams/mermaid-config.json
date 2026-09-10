@@ -1,0 +1,13 @@
+{
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#CADCFC",
+    "primaryTextColor": "#1E2761",
+    "primaryBorderColor": "#1E2761",
+    "lineColor": "#1E2761",
+    "secondaryColor": "#FFFFFF",
+    "tertiaryColor": "#F2F5FC",
+    "fontFamily": "Malgun Gothic, Arial",
+    "fontSize": "16px"
+  }
+}

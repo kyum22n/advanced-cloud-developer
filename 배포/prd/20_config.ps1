@@ -55,7 +55,8 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Step "3/6 보안 (Key Vault · 워크로드 ID)"
 $kvName = ($cfg.azure.data.keyvault.namePrefix + '-' + $suffix)
-$existingKv = az keyvault list -g $RG --query "[?starts_with(name,'$($cfg.azure.data.keyvault.namePrefix)')].name" -o tsv 2>$null | Select-Object -First 1
+$kvPrefix = $cfg.azure.data.keyvault.namePrefix
+$existingKv = (az keyvault list -g $RG -o json 2>$null | ConvertFrom-Json | Where-Object { $_.name -like "$kvPrefix*" } | Select-Object -First 1).name
 if ($existingKv) { $kvName = $existingKv; Write-Info ("Key Vault 재사용: " + $kvName) }
 else { Invoke-Checked -What 'key vault' -Script { az keyvault create -g $RG -n $kvName -l $loc --enable-rbac-authorization true -o none } }
 
@@ -71,89 +72,128 @@ Write-Info "관리 ID 준비 완료 — 이 주체에 '리소스 단위 최소 �
 $kvId = az keyvault show -n $kvName --query id -o tsv
 Grant-AzRole -PrincipalId $idPrincipal -Role 'Key Vault Secrets User' -Scope $kvId | Out-Null
 
-Write-Step "4/6 PaaS 데이터 (PostgreSQL 유연한 서버 · Redis · Storage)"
-$dbPw = [Environment]::GetEnvironmentVariable($pg.adminPasswordEnvVar)
-if (-not $dbPw) { throw ("환경 변수 {0} 가 필요합니다." -f $pg.adminPasswordEnvVar) }
-$pwAuth = $cfg.identity.postgresPasswordAuth
-if (-not $pwAuth) { $pwAuth = 'Enabled' }
-if ($pwAuth -eq 'Enabled') {
-    Write-Warn2 "PostgreSQL 암호 인증이 켜져 있습니다(실습 호환). 운영 목표 상태는 'Disabled' — 앱이 토큰 인증으로 전환된 뒤 바꾸세요."
-}
+# 배포 스크립트를 실행하는 로그인 계정 자신에게는 '쓰기'(Secrets Officer)가 필요하다 —
+# RBAC 인가 Key Vault라 앱 관리 ID(읽기 전용)와 별개로, 비밀을 실제로 넣는 이 계정에 부여해야 한다.
+# (2026-08-29 최종검토: 이 역할이 없어 az keyvault secret set 이 ForbiddenByRbac 로 실패하는데도
+#  스크립트가 오류를 확인하지 않고 무조건 성공으로 표시하던 버그를 함께 수정)
+$callerId = az ad signed-in-user show --query id -o tsv 2>$null
+if ($callerId) {
+    az role assignment create --assignee-object-id $callerId --assignee-principal-type User `
+        --role 'Key Vault Secrets Officer' --scope $kvId -o none 2>$null
+    if ($LASTEXITCODE -eq 0) { Write-Ok '역할 부여: Key Vault Secrets Officer (로그인 계정)' }
+    else { Write-Warn2 '로그인 계정에 Key Vault Secrets Officer 부여 실패(이미 있을 수 있음) — 계속 진행' }
+} else { Write-Warn2 '로그인 계정 조회 실패 — Key Vault 쓰기 역할을 부여하지 못했습니다.' }
+Write-Info 'Key Vault RBAC 역할 전파 대기 (30초)'
+Start-Sleep -Seconds 30
 
-$pgExists = az postgres flexible-server show -g $RG -n $pg.name -o none 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Write-Info "PostgreSQL 유연한 서버 생성 (영역 중복 HA · 5~10분 소요)"
-    Invoke-Checked -What 'postgres flexible-server create' -Script {
-        az postgres flexible-server create -g $RG -n $pg.name -l $loc `
-            --tier $pg.tier --sku-name $pg.sku --storage-size $pg.storageGb --version $pg.version `
-            --high-availability $pg.haMode --backup-retention $pg.backupRetentionDays `
-            --admin-user $pg.adminUser --admin-password $dbPw `
-            --active-directory-auth Enabled --password-auth $pwAuth `
-            --public-access None --yes -o none
+$skipPaasData = [bool]$cfg.skipPaasData
+$pgHost = $null; $redisHost = $null; $saName = $null; $pwAuth = 'Enabled'
+if (-not $skipPaasData) {
+    Write-Step "4/6 PaaS 데이터 (PostgreSQL 유연한 서버 · Redis · Storage)"
+    $dbPw = [Environment]::GetEnvironmentVariable($pg.adminPasswordEnvVar)
+    if (-not $dbPw) { throw ("환경 변수 {0} 가 필요합니다." -f $pg.adminPasswordEnvVar) }
+    $pwAuth = $cfg.identity.postgresPasswordAuth
+    if (-not $pwAuth) { $pwAuth = 'Enabled' }
+    if ($pwAuth -eq 'Enabled') {
+        Write-Warn2 "PostgreSQL 암호 인증이 켜져 있습니다(실습 호환). 운영 목표 상태는 'Disabled' — 앱이 토큰 인증으로 전환된 뒤 바꾸세요."
     }
-}
-Invoke-Checked -What 'database 생성' -Script {
-    az postgres flexible-server db create -g $RG -s $pg.name -d $pg.database -o none 2>$null
-}
 
-$redis = $cfg.azure.data.redis
-$redisExists = az redis show -g $RG -n $redis.name -o none 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Invoke-Checked -What 'redis create' -Script {
-        az redis create -g $RG -n $redis.name -l $loc --sku $redis.sku --vm-size $redis.vmSize `
-            --minimum-tls-version 1.2 -o none
+    $pgExists = az postgres flexible-server show -g $RG -n $pg.name -o none 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Info "PostgreSQL 유연한 서버 생성 (영역 중복 HA · 5~10분 소요)"
+        Invoke-Checked -What 'postgres flexible-server create' -Script {
+            az postgres flexible-server create -g $RG -n $pg.name -l $loc `
+                --tier $pg.tier --sku-name $pg.sku --storage-size $pg.storageGb --version $pg.version `
+                --high-availability $pg.haMode --backup-retention $pg.backupRetentionDays `
+                --admin-user $pg.adminUser --admin-password $dbPw `
+                --active-directory-auth Enabled --password-auth $pwAuth `
+                --public-access None --yes -o none
+        }
     }
-}
-
-$saName = ($cfg.azure.data.storage.namePrefix + $suffix)
-$existingSa = az storage account list -g $RG --query "[?starts_with(name,'$($cfg.azure.data.storage.namePrefix)')].name" -o tsv 2>$null | Select-Object -First 1
-if ($existingSa) { $saName = $existingSa } else {
-    Invoke-Checked -What 'storage account' -Script {
-        az storage account create -g $RG -n $saName -l $loc --sku $cfg.azure.data.storage.sku `
-            --kind StorageV2 --min-tls-version TLS1_2 --allow-shared-key-access false -o none
+    Invoke-Checked -What 'database 생성' -Script {
+        az postgres flexible-server db create -g $RG -s $pg.name -d $pg.database -o none 2>$null
     }
-}
 
-Write-Step "4-1/6 비밀번호 없는 데이터 접근 (Entra ID 인증 · 최소 권한 역할)"
-# ① PostgreSQL — 토큰으로 접속할 수 있게 한다
-if ($cfg.identity.passwordless.postgres) {
-    Enable-PostgresEntraAuth -ResourceGroup $RG -Server $pg.name `
-        -PrincipalId $idPrincipal -DisplayName $idName -PasswordAuth $pwAuth
+    $redis = $cfg.azure.data.redis
+    $redisExists = az redis show -g $RG -n $redis.name -o none 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Invoke-Checked -What 'redis create' -Script {
+            az redis create -g $RG -n $redis.name -l $loc --sku $redis.sku --vm-size $redis.vmSize `
+                --minimum-tls-version 1.2 -o none
+        }
+    }
+
+    $saName = ($cfg.azure.data.storage.namePrefix + $suffix)
+    $saPrefix = $cfg.azure.data.storage.namePrefix
+    $existingSa = (az storage account list -g $RG -o json 2>$null | ConvertFrom-Json | Where-Object { $_.name -like "$saPrefix*" } | Select-Object -First 1).name
+    if ($existingSa) { $saName = $existingSa } else {
+        Invoke-Checked -What 'storage account' -Script {
+            az storage account create -g $RG -n $saName -l $loc --sku $cfg.azure.data.storage.sku `
+                --kind StorageV2 --min-tls-version TLS1_2 --allow-shared-key-access false -o none
+        }
+    }
+
+    Write-Step "4-1/6 비밀번호 없는 데이터 접근 (Entra ID 인증 · 최소 권한 역할)"
+    # ① PostgreSQL — 토큰으로 접속할 수 있게 한다
+    if ($cfg.identity.passwordless.postgres) {
+        Enable-PostgresEntraAuth -ResourceGroup $RG -Server $pg.name `
+            -PrincipalId $idPrincipal -DisplayName $idName -PasswordAuth $pwAuth
+    }
+    # ② Redis — 액세스 키가 아니라 Entra 주체로 접근한다
+    if ($cfg.identity.passwordless.redis) {
+        Grant-RedisDataAccess -ResourceGroup $RG -Cache $redis.name `
+            -PrincipalId $idPrincipal -Alias $idName -Policy 'Data Contributor'
+    }
+    # ③ Storage — 공유 키는 이미 비활성. 데이터 평면 역할을 부여한다
+    if ($cfg.identity.passwordless.storage) {
+        $saId = az storage account show -g $RG -n $saName --query id -o tsv
+        Grant-AzRole -PrincipalId $idPrincipal -Role 'Storage Blob Data Contributor' -Scope $saId | Out-Null
+    }
+} else {
+    Write-Warn2 "skipPaasData=true — myapp이 쓰지 않는 PostgreSQL·Redis·Storage 생성을 생략합니다(2026-08-29 최종검토, 사용자 승인)."
 }
-# ② Redis — 액세스 키가 아니라 Entra 주체로 접근한다
-if ($cfg.identity.passwordless.redis) {
-    Grant-RedisDataAccess -ResourceGroup $RG -Cache $redis.name `
-        -PrincipalId $idPrincipal -Alias $idName -Policy 'Data Contributor'
-}
-# ③ Storage — 공유 키는 이미 비활성. 데이터 평면 역할을 부여한다
-if ($cfg.identity.passwordless.storage) {
-    $saId = az storage account show -g $RG -n $saName --query id -o tsv
-    Grant-AzRole -PrincipalId $idPrincipal -Role 'Storage Blob Data Contributor' -Scope $saId | Out-Null
-}
-# ④ ACR — AKS kubelet 관리 ID 가 pull 한다(--attach-acr). 앱 관리 ID 에도 pull 만 명시 부여
+# ACR — AKS kubelet 관리 ID 가 pull 한다(--attach-acr). 앱 관리 ID 에도 pull 만 명시 부여(skipPaasData 무관)
 if ($cfg.identity.passwordless.acr) {
     $acrId = az acr show -n $cfg.azure.acrName -g $RG --query id -o tsv 2>$null
     if ($acrId) { Grant-AzRole -PrincipalId $idPrincipal -Role 'AcrPull' -Scope $acrId | Out-Null }
 }
 
 Write-Step "5/6 비밀을 Key Vault 에 저장 (값은 화면에 출력하지 않음)"
-$pgHost = az postgres flexible-server show -g $RG -n $pg.name --query fullyQualifiedDomainName -o tsv
-$redisHost = az redis show -g $RG -n $redis.name --query hostName -o tsv
-# 비밀은 '필요한 것만' 넣는다 — 토큰으로 대체된 값은 애초에 저장하지 않는다
-$secrets = @(
-    @{n='db-host';   v=$pgHost},
-    @{n='db-user';   v=$(if ($pwAuth -eq 'Disabled') { $idName } else { $pg.adminUser })},
-    @{n='redis-host';v=$redisHost}
-)
-if ($pwAuth -eq 'Enabled') {
-    $secrets += @{n='db-password'; v=$dbPw}
+$secrets = @()
+if (-not $skipPaasData) {
+    $pgHost = az postgres flexible-server show -g $RG -n $pg.name --query fullyQualifiedDomainName -o tsv
+    $redisHost = az redis show -g $RG -n $redis.name --query hostName -o tsv
+    # 비밀은 '필요한 것만' 넣는다 — 토큰으로 대체된 값은 애초에 저장하지 않는다
+    $secrets += @(
+        @{n='db-host';   v=$pgHost},
+        @{n='db-user';   v=$(if ($pwAuth -eq 'Disabled') { $idName } else { $pg.adminUser })},
+        @{n='redis-host';v=$redisHost}
+    )
+    if ($pwAuth -eq 'Enabled') {
+        $secrets += @{n='db-password'; v=$dbPw}
+    } else {
+        Write-Info "암호 인증 비활성 — db-password 를 Key Vault 에 저장하지 않습니다(토큰 인증 사용)"
+        az keyvault secret delete --vault-name $kvName --name 'db-password' -o none 2>$null
+    }
 } else {
-    Write-Info "암호 인증 비활성 — db-password 를 Key Vault 에 저장하지 않습니다(토큰 인증 사용)"
-    az keyvault secret delete --vault-name $kvName --name 'db-password' -o none 2>$null
+    Write-Info "skipPaasData=true — db-host/db-user/db-password/redis-host 비밀 저장을 생략합니다(myapp 미사용)."
 }
+
+# myapp 자체가 쓰는 비밀값 — 환경 변수로만 받는다. 없으면 빈 문자열로 저장한다(앱이 "미설정"으로 정상 처리).
+$githubToken  = [Environment]::GetEnvironmentVariable('GITHUB_TOKEN')
+$notionToken  = [Environment]::GetEnvironmentVariable('NOTION_TOKEN')
+$notionPageId = [Environment]::GetEnvironmentVariable('NOTION_PARENT_PAGE_ID')
+if (-not $githubToken)  { Write-Warn2 '환경 변수 GITHUB_TOKEN 이 없어 빈 값으로 저장합니다.' }
+if (-not $notionToken)  { Write-Warn2 '환경 변수 NOTION_TOKEN 이 없어 빈 값으로 저장합니다.' }
+if (-not $notionPageId) { Write-Warn2 '환경 변수 NOTION_PARENT_PAGE_ID 가 없어 빈 값으로 저장합니다.' }
+$secrets += @{n='github-token'; v=$(if ($githubToken) { $githubToken } else { ' ' })}
+$secrets += @{n='notion-token'; v=$(if ($notionToken) { $notionToken } else { ' ' })}
+$secrets += @{n='notion-parent-page-id'; v=$(if ($notionPageId) { $notionPageId } else { ' ' })}
+
 foreach ($s in $secrets) {
     az keyvault secret set --vault-name $kvName --name $s.n --value $s.v --output none
-    Write-Ok ("Key Vault 비밀 저장: " + $s.n)
+    if ($LASTEXITCODE -eq 0) { Write-Ok ("Key Vault 비밀 저장: " + $s.n) }
+    else { throw ("Key Vault 비밀 저장 실패: " + $s.n + " (exit=" + $LASTEXITCODE + ")") }
 }
 
 Write-Step "6/6 AKS (영역 분산 · 시스템/사용자 노드 풀 분리 · 애드온)"
@@ -177,15 +217,19 @@ if ($LASTEXITCODE -ne 0) {
     az acr show -n $cfg.azure.acrName -g $RG -o none 2>$null
     if ($LASTEXITCODE -ne 0) { az acr create -g $RG -n $cfg.azure.acrName --sku Standard -l $loc -o none }
     Invoke-Checked -What 'aks create' -Script { az @a }
-
-    Invoke-Checked -What '사용자 노드 풀 추가' -Script {
-        az aks nodepool add -g $RG --cluster-name $aks.name -n user `
-            --node-count $aks.userNodeCount --node-vm-size $aks.userNodeSize `
-            --zones $aks.zones[0] $aks.zones[1] $aks.zones[2] `
-            --enable-cluster-autoscaler --min-count $aks.userNodeMin --max-count $aks.userNodeMax `
-            --mode User -o none
-    }
 }
+$userPoolExists = az aks nodepool show -g $RG --cluster-name $aks.name -n user -o none 2>$null
+if ($LASTEXITCODE -ne 0) {
+    az aks nodepool add -g $RG --cluster-name $aks.name -n user `
+        --node-count $aks.userNodeCount --node-vm-size $aks.userNodeSize `
+        --zones $aks.zones[0] $aks.zones[1] $aks.zones[2] `
+        --enable-cluster-autoscaler --min-count $aks.userNodeMin --max-count $aks.userNodeMax `
+        --mode User -o none
+    if ($LASTEXITCODE -eq 0) { Write-Ok '사용자 노드 풀 추가 완료' }
+    else {
+        Write-Warn2 "사용자 노드 풀 추가 실패(vCPU 쿼터 소진, 2026-08-29 확인) — 시스템 노드 풀에 워크로드를 배포합니다."
+    }
+} else { Write-Info '사용자 노드 풀 이미 존재 — 생성 생략' }
 if ($cfg.azure.observability.enableManagedPrometheus) {
     az aks update -g $RG -n $aks.name --enable-azure-monitor-metrics -o none 2>$null
 }

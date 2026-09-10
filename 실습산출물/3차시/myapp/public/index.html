@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>레포 분석 · 실행 화면</title>
+<link rel="stylesheet" href="common.css">
+</head>
+<body>
+<header>
+  <div class="title">📦 레포 인사이트 · GitHub → Notion 포트폴리오 리포트 도구</div>
+  <nav>
+    <a href="index.html" class="active">분석 실행</a>
+    <a href="history.html">이력 목록</a>
+  </nav>
+</header>
+<main>
+  <div class="card" id="envNotice" style="display:none;"></div>
+
+  <div class="card">
+    <h2>1. 포트폴리오에 정리할 내 GitHub 공개 레포 URL 입력</h2>
+    <label for="repoUrl">레포 URL</label>
+    <input type="text" id="repoUrl" placeholder="https://github.com/owner/repo" value="https://github.com/octocat/Hello-World" />
+    <div class="meta">공개(public) 레포만 지원됩니다. 기본 브랜치 기준 최근 커밋 30개를 수집합니다.</div>
+    <br>
+    <button class="btn" id="analyzeBtn">분석 실행</button>
+    <span id="analyzeStatus" class="meta"></span>
+  </div>
+
+  <div class="card error-box" id="errorBox" style="display:none;"></div>
+
+  <div class="card" id="resultCard" style="display:none;">
+    <h2>2. 결과 미리보기</h2>
+    <div class="meta" id="metaLine"></div>
+
+    <div class="section-title">프로젝트 구조 (최상위 디렉터리 기준)</div>
+    <div id="structureBox" class="meta" style="font-family: Consolas, monospace; line-height:1.6;"></div>
+
+    <div class="section-title">기술 스택 구성비</div>
+    <svg id="langChart" width="100%" height="140" viewBox="0 0 600 140" xmlns="http://www.w3.org/2000/svg"></svg>
+
+    <div class="section-title">최근 커밋 요약 (SHA 중복 제거, 최대 30건 중 상위 5건 표시)</div>
+    <table>
+      <thead><tr><th>SHA</th><th>메시지 요약</th><th>일자</th></tr></thead>
+      <tbody id="commitRows"></tbody>
+    </table>
+    <div class="meta">※ 커밋 작성자 이메일 등 개인식별 메타데이터는 마스킹되어 표시되지 않습니다.</div>
+
+    <div class="section-title">생성된 리포트 (Markdown 원본)</div>
+    <pre class="notice" id="reportPreview" style="white-space:pre-wrap; max-height:360px; overflow-y:auto;"></pre>
+
+    <button class="btn notion" id="notionBtn">🔗 Notion에 업로드</button>
+    <span id="notionStatus" class="meta"></span>
+    <div class="meta">업로드 대상: .env의 NOTION_PARENT_PAGE_ID로 지정된 포트폴리오 아카이브 페이지</div>
+  </div>
+
+  <div class="footer-note">현재 역할: 일반(user). 관리자 화면은 <code>?role=admin</code> 쿼리로 전환됩니다.</div>
+</main>
+
+<script>
+let currentAnalysisId = null;
+
+function esc(s) { return String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+async function loadEnvStatus() {
+  const r = await fetch('/api/env-status');
+  const s = await r.json();
+  const box = document.getElementById('envNotice');
+  const missing = [];
+  if (!s.githubTokenSet) missing.push('GITHUB_TOKEN(없어도 동작하나 Rate Limit이 매우 낮습니다)');
+  if (!s.notionTokenSet) missing.push('NOTION_TOKEN');
+  if (!s.notionParentPageIdSet) missing.push('NOTION_PARENT_PAGE_ID');
+  if (missing.length) {
+    box.style.display = 'block';
+    box.className = 'card notice';
+    box.innerHTML = '<b>⚠ 설정값 안내</b><br>다음 항목이 .env에 비어 있습니다: ' + missing.join(', ');
+  }
+}
+
+function renderStructure(structure) {
+  const box = document.getElementById('structureBox');
+  if (!structure || (!structure.topLevelDirs.length && !structure.topLevelFiles.length)) {
+    box.textContent = '구조 정보 없음(빈 레포이거나 조회 실패)';
+    return;
+  }
+  const dirLines = structure.topLevelDirs.map(d => `📁 ${esc(d.name)}/ <span style="color:#9aa5b1;">(파일 ${d.fileCount}개)</span>`);
+  const fileLines = structure.topLevelFiles.map(f => `📄 ${esc(f)}`);
+  box.innerHTML = [...dirLines, ...fileLines].join('<br>') +
+    (structure.truncated ? '<br><span style="color:#c53030;">⚠ 응답 일부 생략(truncated) — 대형 레포</span>' : '') +
+    `<br><span style="color:#9aa5b1;">총 파일 ${structure.totalFiles}개</span>`;
+}
+
+function renderChart(languageStats) {
+  const svg = document.getElementById('langChart');
+  const rows = languageStats.slice(0, 6);
+  if (!rows.length) {
+    svg.innerHTML = '<text x="0" y="20" font-size="13" fill="#7b8794">언어 통계 없음</text>';
+    return;
+  }
+  const colors = ['#2b6cb0', '#63b3ed', '#f6c343', '#68d391', '#f687b3', '#a0aec0'];
+  let svgContent = '';
+  rows.forEach((l, i) => {
+    const y = i * 22;
+    const width = Math.max(2, l.ratio * 4);
+    svgContent += `<text x="0" y="${y + 14}" font-size="12" fill="#52606d">${esc(l.language)}</text>`;
+    svgContent += `<rect x="90" y="${y + 2}" width="${width}" height="14" fill="${colors[i % colors.length]}"></rect>`;
+    svgContent += `<text x="${100 + width}" y="${y + 14}" font-size="12" fill="#1f2933">${l.ratio}%</text>`;
+  });
+  svg.innerHTML = svgContent;
+}
+
+async function runAnalyze() {
+  const repoUrl = document.getElementById('repoUrl').value.trim();
+  const statusEl = document.getElementById('analyzeStatus');
+  const errorBox = document.getElementById('errorBox');
+  const resultCard = document.getElementById('resultCard');
+  errorBox.style.display = 'none';
+  resultCard.style.display = 'none';
+  statusEl.textContent = '분석 중...';
+
+  try {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ repoUrl }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      errorBox.style.display = 'block';
+      errorBox.innerHTML = `<h3>⚠ 분석 실패 (HTTP ${res.status})</h3><p>${esc(data.error)}</p>`;
+      statusEl.textContent = '';
+      return;
+    }
+    currentAnalysisId = data.analysisId;
+    const a = data.analysis;
+    document.getElementById('metaLine').innerHTML =
+      `레포: <b>${esc(a.owner)}/${esc(a.repo)}</b> | 기본 브랜치: ${esc(a.defaultBranch)} | ` +
+      `HEAD SHA: <code>${esc(a.headSha.slice(0,7))}</code> | 수집 시각(UTC): ${esc(a.collectedAt)} | ` +
+      `라이선스: <span class="badge ${a.license==='라이선스 미확인'?'fail':'ok'}">${esc(a.license)}</span>`;
+    renderStructure(a.structure);
+    renderChart(a.languageStats);
+    document.getElementById('commitRows').innerHTML = a.commits.slice(0,5).map(c =>
+      `<tr><td><code>${esc(c.sha.slice(0,7))}</code></td><td>${esc(c.messageShort)}</td><td>${esc((c.committedAt||'').slice(0,10) || '날짜 미상')}</td></tr>`
+    ).join('') || '<tr><td colspan="3">커밋 없음(빈 레포)</td></tr>';
+    document.getElementById('reportPreview').textContent = data.markdown;
+    document.getElementById('notionStatus').textContent = '';
+    resultCard.style.display = 'block';
+    statusEl.textContent = '완료';
+  } catch (e) {
+    errorBox.style.display = 'block';
+    errorBox.innerHTML = `<h3>⚠ 요청 중 오류</h3><p>${esc(e.message)}</p>`;
+  }
+}
+
+async function uploadNotion() {
+  if (!currentAnalysisId) return;
+  const statusEl = document.getElementById('notionStatus');
+  statusEl.textContent = '업로드 중...';
+  try {
+    const res = await fetch(`/api/analyses/${currentAnalysisId}/notion-upload`, { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) {
+      statusEl.innerHTML = `<span style="color:#c53030;">업로드 실패(HTTP ${res.status}): ${esc(data.error)}</span>`;
+      return;
+    }
+    statusEl.innerHTML = `업로드 완료: <a href="${esc(data.notionUrl)}" target="_blank">${esc(data.notionUrl)}</a>`;
+  } catch (e) {
+    statusEl.innerHTML = `<span style="color:#c53030;">업로드 실패: ${esc(e.message)}</span>`;
+  }
+}
+
+document.getElementById('analyzeBtn').addEventListener('click', runAnalyze);
+document.getElementById('notionBtn').addEventListener('click', uploadNotion);
+loadEnvStatus();
+</script>
+</body>
+</html>

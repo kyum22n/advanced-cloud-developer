@@ -1,0 +1,465 @@
+# 드론 배달 — API 계약 (진실의 원천)
+#
+# ⚠️ 이 파일이 «계약»이고, 코드가 이것을 따른다.
+#    코드에서 생성한 OpenAPI(/v3/api-docs)와 이 파일이 다르면 계약 테스트가 실패해야 한다.
+#    → 테스트/integration/20_contract.ps1
+#
+# 근거: 설계/04_API_설계서.md
+
+openapi: 3.1.0
+
+info:
+  title: Fabrikam 드론 배달 API
+  version: 1.0.0
+  description: |
+    드론 배달 예약 · 추적 · 이력 조회.
+
+    ## 공개 API 와 내부 API
+    이 문서는 **공개 API** 만 기술한다. 내부 API(Package · Account · Delivery 쓰기)는
+    게이트웨이에서 외부로 라우팅하지 않으며, 각 서비스의 Swagger UI 에서 확인한다.
+
+    ## 비동기 접수
+    배달 예약은 `202 Accepted` 를 돌려준다. **접수했다는 뜻이지 만들어졌다는 뜻이 아니다.**
+    `statusUrl` 을 폴링해 진행 상황을 확인한다.
+
+    ## 멱등성
+    `POST /deliveries` 는 `Idempotency-Key` 헤더가 **필수**다.
+    같은 키로 같은 본문을 보내면 첫 응답을 그대로 돌려준다.
+    같은 키로 **다른 본문**을 보내면 `422` 로 거부한다.
+
+servers:
+  - url: https://api.fabrikam.example
+    description: 운영
+  - url: https://api-stg.fabrikam.example
+    description: 검증
+
+tags:
+  - name: Ingestion
+    description: 배달 요청 접수
+  - name: Deliveries
+    description: 배달 상태 · 추적
+  - name: History
+    description: 배달 이력 · 집계
+  - name: Drones
+    description: 드론 텔레메트리
+
+paths:
+  /api/v1/deliveries:
+    post:
+      tags: [Ingestion]
+      summary: 배달 예약 요청 접수
+      description: |
+        요청을 큐에 넣고 즉시 응답한다 (목표 p95 ≤ 300 ms · NFR-01).
+        실제 배달 생성은 비동기로 진행된다.
+      operationId: createDelivery
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeliveryRequest'
+      responses:
+        '202':
+          description: 접수 완료 — 아직 생성되지 않았다
+          headers:
+            Location:
+              description: 생성될 배달의 위치
+              schema: { type: string }
+            Retry-After:
+              description: 몇 초 뒤에 조회하면 되는가
+              schema: { type: integer, example: 2 }
+            X-Correlation-Id:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AcceptedResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          description: 같은 멱등 키로 다른 내용을 보냄
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/deliveries/{deliveryId}:
+    parameters:
+      - $ref: '#/components/parameters/DeliveryId'
+    get:
+      tags: [Deliveries]
+      summary: 배달 상세 조회
+      operationId: getDelivery
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryResponse' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Deliveries]
+      summary: 배달 취소
+      description: |
+        **INV-01** — `IN_TRANSIT` 이후에는 취소할 수 없다.
+        이때는 `409` 를 반환하며, 이것은 «요청이 잘못됐다(400)»가 아니라
+        «요청은 맞지만 지금 상태에서 불가»라는 뜻이다.
+      operationId: cancelDelivery
+      parameters:
+        - name: reason
+          in: query
+          required: false
+          schema: { type: string, maxLength: 200 }
+      responses:
+        '200':
+          description: 취소 완료
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryResponse' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: 현재 상태에서 취소할 수 없음 (INV-01)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/deliveries/{deliveryId}/status:
+    parameters:
+      - $ref: '#/components/parameters/DeliveryId'
+    get:
+      tags: [Deliveries]
+      summary: 배달 상태 조회 (추적 화면 전용)
+      description: |
+        필요한 필드만 담은 경량 응답. 목표 p95 ≤ 150 ms (NFR-02).
+        Redis 의 구체화된 뷰에서 조인 없이 한 번에 읽는다.
+      operationId: getDeliveryStatus
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeliveryStatusResponse' }
+        '404':
+          description: |
+            배달을 찾을 수 없음.
+            **접수 직후에는 아직 생성되지 않아 404 가 나올 수 있다** — 정상이다.
+            클라이언트는 `Retry-After` 만큼 기다렸다가 다시 조회한다.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  /api/v1/history/{deliveryId}:
+    parameters:
+      - $ref: '#/components/parameters/DeliveryId'
+    get:
+      tags: [History]
+      summary: 배달 이력 상세 조회
+      operationId: getHistory
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HistoryResponse' }
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/history:
+    get:
+      tags: [History]
+      summary: 기간 · 계정별 이력 목록
+      description: 페이징 필수. 한 번에 최대 100건.
+      operationId: listHistory
+      parameters:
+        - { name: ownerId, in: query, required: true, schema: { type: string } }
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/HistoryResponse' }
+
+  /api/v1/drones/{droneId}/telemetry:
+    parameters:
+      - name: droneId
+        in: path
+        required: true
+        schema: { type: string, example: drn-0042 }
+    post:
+      tags: [Drones]
+      summary: 드론 텔레메트리 보고
+      description: |
+        드론 디바이스가 주기적으로 호출한다. 목표 처리량 10,000 msg/s (NFR-04).
+        `DroneStatusChanged` 이벤트가 발행되어 Delivery 서비스가 ETA 를 재계산한다.
+      operationId: reportTelemetry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TelemetryRequest' }
+      responses:
+        '200':
+          description: 반영 완료
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+components:
+  parameters:
+    DeliveryId:
+      name: deliveryId
+      in: path
+      required: true
+      description: 배달 식별자
+      schema: { type: string, example: dlv-7f3a9c }
+
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        멱등 키 (UUID 권장). **필수**.
+        네트워크 오류로 응답을 못 받은 클라이언트가 재시도해도
+        배달이 두 번 만들어지지 않게 한다.
+      schema: { type: string, example: 550e8400-e29b-41d4-a716-446655440000 }
+
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: |
+        분산 추적 상관 ID. 없으면 게이트웨이가 생성한다.
+        응답 헤더로 그대로 돌아오며, 이 값으로 서비스 횡단 로그를 검색한다.
+      schema: { type: string }
+
+  responses:
+    BadRequest:
+      description: 요청 «형식»이 잘못됨
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+    NotFound:
+      description: 리소스를 찾을 수 없음
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+    TooManyRequests:
+      description: 속도 제한 초과
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+    ServiceUnavailable:
+      description: 일시적으로 처리할 수 없음 — 잠시 후 재시도
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ProblemDetail' }
+
+  schemas:
+    Location:
+      type: object
+      required: [latitude, longitude]
+      properties:
+        latitude:  { type: number, format: double, minimum: -90,  maximum: 90,  example: 37.5665 }
+        longitude: { type: number, format: double, minimum: -180, maximum: 180, example: 126.9780 }
+        altitude:  { type: number, format: double, minimum: 0, default: 0, description: 고도(m) }
+
+    TimeWindow:
+      type: object
+      required: [earliest, latest]
+      properties:
+        earliest: { type: string, format: date-time }
+        latest:   { type: string, format: date-time }
+
+    PackageInfo:
+      type: object
+      required: [weight, unit, size]
+      properties:
+        weight:      { type: number, format: double, exclusiveMinimum: 0, example: 2.5 }
+        unit:        { type: string, enum: [KG, G], example: KG }
+        size:        { type: string, enum: [SMALL, MEDIUM, LARGE] }
+        description: { type: string, maxLength: 200 }
+
+    Eta:
+      type: object
+      description: 예상 도착 시간. 값 개체이므로 갱신이 아니라 «교체»된다.
+      properties:
+        arrivalTime: { type: string, format: date-time, description: 예상 도착 시각 }
+        estimatedAt: { type: string, format: date-time, description: 이 예측을 산출한 시각 }
+        confidence:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          description: |
+            신뢰도. 위치 정보가 오래됐을수록 낮아진다.
+            5분 지난 위치로 계산한 ETA 를 «신뢰도 1.0» 이라 하면 거짓말이다.
+
+    DeliveryStatus:
+      type: string
+      description: |
+        배달 상태.
+
+        ```
+        PENDING ──▶ SCHEDULED ──▶ IN_TRANSIT ──▶ HEADED_TO_DROPOFF ──▶ COMPLETED
+           │            │              │                 │
+           │            │              └────────┬────────┘
+           │            │                       ▼
+           │            │                    FAILED ──▶ COMPENSATED
+           ├──▶ DELEGATED ──▶ COMPLETED
+           └──▶ CANCELLED ◀───┘ (SCHEDULED 까지만)
+        ```
+      enum:
+        - PENDING
+        - SCHEDULED
+        - DELEGATED
+        - IN_TRANSIT
+        - HEADED_TO_DROPOFF
+        - COMPLETED
+        - CANCELLED
+        - FAILED
+        - COMPENSATED
+
+    CreateDeliveryRequest:
+      type: object
+      required: [ownerId, pickup, dropoff, pickupWindow, packageInfo]
+      properties:
+        ownerId:      { type: string, example: acc-0001 }
+        pickup:       { $ref: '#/components/schemas/Location' }
+        dropoff:      { $ref: '#/components/schemas/Location' }
+        pickupWindow: { $ref: '#/components/schemas/TimeWindow' }
+        packageInfo:  { $ref: '#/components/schemas/PackageInfo' }
+
+    AcceptedResponse:
+      type: object
+      required: [deliveryId, status, statusUrl]
+      properties:
+        deliveryId:    { type: string, example: dlv-7f3a9c }
+        status:        { type: string, example: PENDING }
+        statusUrl:     { type: string, example: /api/v1/deliveries/dlv-7f3a9c/status }
+        correlationId: { type: string }
+
+    DeliveryResponse:
+      type: object
+      properties:
+        deliveryId:      { type: string }
+        ownerId:         { type: string }
+        packageId:       { type: string }
+        droneId:         { type: string, nullable: true }
+        status:          { $ref: '#/components/schemas/DeliveryStatus' }
+        pickup:          { $ref: '#/components/schemas/Location' }
+        dropoff:         { $ref: '#/components/schemas/Location' }
+        currentLocation: { $ref: '#/components/schemas/Location' }
+        eta:             { $ref: '#/components/schemas/Eta' }
+        createdAt:       { type: string, format: date-time }
+        updatedAt:       { type: string, format: date-time }
+        version:         { type: integer, format: int64, description: 낙관적 동시성 버전 }
+
+    DeliveryStatusResponse:
+      type: object
+      description: 추적 화면 전용 경량 응답. 필드가 적은 것이 «설계»다.
+      properties:
+        deliveryId:    { type: string }
+        status:        { $ref: '#/components/schemas/DeliveryStatus' }
+        droneLocation: { $ref: '#/components/schemas/Location' }
+        eta:           { $ref: '#/components/schemas/Eta' }
+        updatedAt:     { type: string, format: date-time }
+
+    TelemetryRequest:
+      type: object
+      required: [latitude, longitude, batteryPercent]
+      properties:
+        latitude:       { type: number, format: double, minimum: -90,  maximum: 90 }
+        longitude:      { type: number, format: double, minimum: -180, maximum: 180 }
+        altitude:       { type: number, format: double, minimum: 0 }
+        batteryPercent: { type: integer, minimum: 0, maximum: 100, example: 82 }
+
+    Milestone:
+      type: object
+      properties:
+        eventType:  { type: string, example: DeliveryCompleted }
+        occurredAt: { type: string, format: date-time }
+        status:     { type: string }
+
+    HistoryResponse:
+      type: object
+      properties:
+        deliveryId:      { type: string }
+        ownerId:         { type: string }
+        packageId:       { type: string }
+        droneId:         { type: string, nullable: true }
+        finalStatus:     { type: string }
+        createdAt:       { type: string, format: date-time }
+        completedAt:     { type: string, format: date-time, nullable: true }
+        failureReason:   { type: string, nullable: true }
+        durationSeconds: { type: integer, format: int64, description: 아직 진행 중이면 -1 }
+        milestones:
+          type: array
+          items: { $ref: '#/components/schemas/Milestone' }
+
+    ProblemDetail:
+      type: object
+      description: |
+        RFC 9457 Problem Details.
+
+        ⚠️ 클라이언트는 사람이 읽는 `title` 이 아니라 **`type`(URI)로 분기**해야 한다.
+        문구는 바뀔 수 있지만 `type` 은 계약이다.
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          example: https://fabrikam.example/errors/invalid-state-transition
+        title:  { type: string, example: 허용되지 않는 상태 전이 }
+        status: { type: integer, example: 409 }
+        detail: { type: string, example: IN_TRANSIT 상태의 배달은 취소할 수 없습니다. }
+        instance: { type: string, example: /api/v1/deliveries/dlv-7f3a9c }
+        correlationId:
+          type: string
+          description: 문의 시 이 값을 알려 주면 서비스 횡단 로그를 바로 찾을 수 있다.
+        errors:
+          type: array
+          description: 필드 수준 검증 오류 (400 일 때)
+          items:
+            type: object
+            properties:
+              field:   { type: string }
+              message: { type: string }
+
+  securitySchemes:
+    entraId:
+      type: oauth2
+      description: Microsoft Entra ID
+      flows:
+        authorizationCode:
+          authorizationUrl: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
+          tokenUrl: https://login.microsoftonline.com/common/oauth2/v2.0/token
+          scopes:
+            'api://fabrikam-drone/Delivery.Write': 배달 예약 · 취소
+            'api://fabrikam-drone/Delivery.Read':  배달 조회 · 추적
+
+security:
+  - entraId:
+      - 'api://fabrikam-drone/Delivery.Read'

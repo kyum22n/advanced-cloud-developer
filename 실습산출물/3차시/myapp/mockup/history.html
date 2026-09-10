@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>레포 분석 · 이력 목록</title>
+<link rel="stylesheet" href="common.css">
+</head>
+<body>
+<header>
+  <div class="title">📦 레포 인사이트 · GitHub → Notion 리포트 도구</div>
+  <nav>
+    <a href="index.html">분석 실행</a>
+    <a href="history.html" class="active">이력 목록</a>
+    <a href="error.html">예외 화면 예시</a>
+  </nav>
+</header>
+<main>
+  <div class="card">
+    <h2>분석 이력</h2>
+    <button class="btn secondary" style="margin-bottom:14px;">⬇ 엑셀(CSV/XLSX) 내보내기</button>
+    <table>
+      <thead>
+        <tr><th>레포</th><th>수집 시각(UTC)</th><th>HEAD SHA</th><th>상태</th><th>Notion 업로드</th><th></th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>octocat/Hello-World</td><td>2026-08-28 06:12</td><td><code>7fd1a60</code></td>
+          <td><span class="badge ok">success</span></td>
+          <td><a href="#">notion.so/...a1b2</a></td>
+          <td><a class="btn secondary" href="index.html#result">다시 보기</a></td>
+        </tr>
+        <tr>
+          <td>facebook/react</td><td>2026-08-27 09:41</td><td><code>a92e1fd</code></td>
+          <td><span class="badge ok">success</span></td>
+          <td><a href="#">notion.so/...c9f2</a></td>
+          <td><a class="btn secondary" href="index.html#result">다시 보기</a></td>
+        </tr>
+        <tr>
+          <td>my-org/private-tool</td><td>2026-08-26 14:03</td><td>-</td>
+          <td><span class="badge fail">failed</span></td>
+          <td>-</td>
+          <td><a class="btn secondary" href="error.html">사유 보기</a></td>
+        </tr>
+        <tr>
+          <td>vercel/next.js</td><td>2026-08-25 11:20</td><td><code>4d8e9aa</code></td>
+          <td><span class="badge ok">success</span></td>
+          <td>미업로드</td>
+          <td><a class="btn secondary" href="index.html#result">다시 보기</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="footer-note">더미 데이터입니다. 실제 이력은 3단계에서 SQLite에 저장된 값을 조회합니다.</div>
+</main>
+</body>
+</html>

@@ -4,6 +4,8 @@
 > **핵심 원칙**: **설정은 Git 에, 비밀과 접속 대상은 Key Vault 에 — 어느 쪽도 이미지 안에 두지 않는다.**
 > **정본**: [`배포/prd/config/`](../../배포/prd/config/) 의 실제 파일
 
+> ⚠️ **myapp 적용 현황 (2026-08-29)** — `env.prd.json`에 `skipPaasData: true`가 있어 §2-3의 PostgreSQL·Redis·Storage는 **실제로 생성되지 않습니다**. Key Vault 비밀도 아래 §3·§6에 서술된 `db-host`/`db-user`/`db-password`/`redis-host` 4종이 아니라 **`github-token`·`notion-token`·`notion-parent-page-id` 3종**만 실제로 저장됩니다(`배포/prd/config/k8s/base/secretprovider.yaml` 참고 — CSI `objects`·`secretObjects`에서 DB/Redis 항목 제거됨). 아래 §2-3·§3·§6은 이 플랫폼이 지원하는 **목표 구성**을 그대로 남겨 두되, 실제 값과의 차이를 각 절에 표시합니다.
+
 ---
 
 ## 1. 설정 흐름
@@ -13,7 +15,7 @@ graph TB
     JSON["config/env.prd.json"] --> S20["20_config.ps1"]
     ENVV["환경 변수<br/>PRD_DB_ADMIN_PASSWORD"] --> S20
     S20 --> AZR["Azure 리소스<br/>VNet·관측·KeyVault·데이터·AKS"]
-    S20 --> KVS["Key Vault 비밀 4종<br/>db-host·db-user<br/>db-password·redis-host"]
+    S20 --> KVS["Key Vault 비밀 3종(myapp)<br/>github-token·notion-token<br/>notion-parent-page-id"]
     S20 --> MI["관리 ID id-myapp-prd<br/>+ 연합 자격 증명"]
     S20 -->|"CLIENT_ID / KEYVAULT_NAME / TENANT_ID 치환"| SPCF["k8s/base/secretprovider.yaml<br/>serviceaccount.yaml"]
 
@@ -30,7 +32,7 @@ graph TB
 | 위치 | 담는 것 | 예 |
 | --- | --- | --- |
 | **Git** | 구조 · 정책 · **이미지 태그** | base/overlay 매니페스트, ConfigMap, HPA, PDB |
-| **Key Vault** | **비밀 + 접속 대상** | `db-host` `db-user` `db-password` `redis-host` |
+| **Key Vault** | **비밀 + 접속 대상** | myapp 실제: `github-token` `notion-token` `notion-parent-page-id` (`db-host`/`db-user`/`db-password`/`redis-host`는 PostgreSQL·Redis를 쓰는 앱 배포 시에만 해당) |
 | **Azure 리소스** | 인프라 상태 | VNet, 노드 풀, DB HA·백업, 공용 액세스 차단 |
 
 > 🚫 **비밀 값은 Git·이미지·ConfigMap 어디에도 존재하지 않습니다.** 매니페스트에는 **참조만** 선언됩니다.
@@ -60,6 +62,8 @@ graph TB
 
 ### 2-3. 데이터
 
+> ⚠️ **myapp은 이 절 전체가 N/A입니다** — `skipPaasData: true`로 PostgreSQL·Redis·Storage 생성 자체를 생략했습니다(SQLite만 사용). 아래 값은 이 플랫폼의 목표 구성이며, `env.prd.json`에는 여전히 정의값이 남아있지만 `20_config.ps1`이 생성을 건너뜁니다.
+
 | 경로 | 값 | 설명 |
 | --- | --- | --- |
 | `azure.data.postgres.name` | `psql-myapp-prd` | **전역 고유** |
@@ -88,6 +92,7 @@ graph TB
 | `app.workloadIdentityName` | `id-myapp-prd` | 관리 ID 이름 |
 | `test.baseUrl` | `""` | `40_deploy` 가 자동 기록 |
 | **`test.allowWrite`** | **`false`** | **쓰기 스모크 금지** |
+| **`skipPaasData`** | `true`(myapp) | **2026-08-29 추가** — PostgreSQL·Redis·Storage 생성 생략 여부. myapp처럼 해당 리소스를 쓰지 않는 앱을 배포할 때 사용. `20_config.ps1`이 §2-3 전체와 관련 Key Vault 비밀 저장을 건너뛰게 함 |
 
 > ⚠️ **전역 고유 이름 4개**(`acrName` · `postgres.name` · `keyvault.namePrefix` · `storage.namePrefix`)와 **`argocd.repoUrl`** 은 자리표시자면 `10_prereq.ps1` 이 중단시킵니다.
 
@@ -100,10 +105,9 @@ graph LR
     SA["ServiceAccount myapp-sa<br/>azure.workload.identity/client-id"] -->|연합| FC["연합 자격 증명<br/>issuer: AKS OIDC<br/>subject: system:serviceaccount:<br/>myapp-prd:myapp-sa"]
     FC --> MI["관리 ID id-myapp-prd"]
     MI -->|"Key Vault Secrets User"| KV["Key Vault"]
-    KV --> S1["db-host"]
-    KV --> S2["db-user"]
-    KV --> S3["db-password"]
-    KV --> S4["redis-host"]
+    KV --> S1["github-token"]
+    KV --> S2["notion-token"]
+    KV --> S3["notion-parent-page-id"]
     SPC["SecretProviderClass myapp-kv"] --> KV
     SPC -->|secretObjects| KS["K8s Secret myapp-secret"]
     KS -->|envFrom| POD["Pod (SA: myapp-sa)"]
@@ -132,9 +136,9 @@ graph LR
 | `usePodIdentity` / `useVMManagedIdentity` | `"false"` / `"false"` | **워크로드 ID 방식** |
 | `clientID` | `CLIENT_ID_PLACEHOLDER` → 치환 | 관리 ID |
 | `keyvaultName` / `tenantId` | 치환 | 대상 금고 |
-| `objects` | 4종 (secret) | 가져올 항목 |
+| `objects` | 3종(secret) — myapp 실제: `github-token`·`notion-token`·`notion-parent-page-id` | 가져올 항목 |
 | `secretObjects[].secretName` | `myapp-secret` | **K8s Secret 동기화** |
-| `secretObjects[].data` | `DB_HOST` `DB_USER` `DB_PASSWORD` `REDIS_HOST` | 환경 변수 키 |
+| `secretObjects[].data` | `GITHUB_TOKEN` `NOTION_TOKEN` `NOTION_PARENT_PAGE_ID` | 환경 변수 키 |
 
 > 📌 **`secretObjects` 가 필요한 이유** — CSI 는 기본적으로 **파일만** 마운트합니다. 앱은 환경 변수를 읽으므로 K8s Secret 으로 동기화해 `envFrom` 으로 주입합니다.
 >
@@ -229,6 +233,8 @@ graph LR
 
 ### 6-2. `myapp-secret` (**CSI 가 생성 · 수동 생성 금지**)
 
+> ⚠️ **myapp 실제 매핑**은 아래 표(DB/Redis 대상 앱용 목표 구성)가 아니라 다음 3개입니다 — `GITHUB_TOKEN`←`github-token`, `NOTION_TOKEN`←`notion-token`, `NOTION_PARENT_PAGE_ID`←`notion-parent-page-id`. myapp은 PostgreSQL/Redis를 쓰지 않아(`skipPaasData=true`) 아래 표는 N/A입니다.
+
 | 키 | Key Vault 객체 | 암호 인증 `Enabled` | 암호 인증 `Disabled`(목표) |
 | --- | --- | :---: | :---: |
 | `DB_HOST` | `db-host` | ✅ | ✅ |
@@ -250,9 +256,10 @@ graph LR
 
 | 변경 | 함께 확인할 것 | 위험 |
 | --- | --- | --- |
-| `postgres.name` | **Key Vault `db-host` 값** | 전체 연결 실패 |
-| `keyvault.namePrefix` | SecretProviderClass `keyvaultName`(20_config 가 치환) | 파드 기동 실패 |
+| `postgres.name` | **Key Vault `db-host` 값**(공통 샘플 앱 전용 — myapp 은 미사용) | 전체 연결 실패(공통 샘플 앱 한정) |
+| `keyvault.namePrefix` | SecretProviderClass `keyvaultName`(40_deploy 가 치환) · **`configmap.yaml` 의 `KEYVAULT_NAME`도 함께 치환**(myapp 의 자가 복구 경로용, [실습산출물/3차시/09_비밀없는접근.md](../../실습산출물/3차시/09_비밀없는접근.md)) | 파드 기동 실패 · myapp 의 Key Vault 직접 조회 실패 |
 | `app.serviceAccount` | 연합 자격 증명 subject · Deployment SA | 인증 실패 |
+| **GitHub PAT·Notion 토큰 회전**(`github-token`·`notion-token`·`notion-parent-page-id` Key Vault 시크릿) | CSI 폴링(기본 2분) 대기 또는 `kubectl rollout restart deploy/myapp` | 회전 전 값 사용 지속(즉시 반영 안 됨) — 절차: [09_비밀없는접근.md §3](../../실습산출물/3차시/09_비밀없는접근.md) |
 | `app.replicas` | overlay `replicas` · PDB `minAvailable`(< replicas) · HPA `minReplicas` | **배포 교착** |
 | `aks.userNodeMax` | HPA `maxReplicas` | 파드 Pending |
 | `DB_POOL_MAX` | HPA `maxReplicas` × 풀 크기 vs DB 연결 상한 | **연결 고갈** |
@@ -265,13 +272,13 @@ graph LR
 | 확인 | 명령 | 기대 |
 | --- | --- | --- |
 | CSI 마운트 | `kubectl describe pod -n myapp-prd \| findstr secrets-store` | 마운트 성공 |
-| 동기화 Secret | `kubectl get secret myapp-secret -n myapp-prd -o jsonpath='{.data}'` | 4개 키 |
+| 동기화 Secret | `kubectl get secret myapp-secret -n myapp-prd -o jsonpath='{.data}'` | myapp: 3개 키(GITHUB_TOKEN·NOTION_TOKEN·NOTION_PARENT_PAGE_ID) |
 | **비밀 평문 미노출** | `kubectl get cm myapp-config -n myapp-prd -o yaml \| findstr -i "password host user"` | **결과 없음** |
 | 워크로드 ID 치환 | `kubectl get sa myapp-sa -n myapp-prd -o yaml \| findstr client-id` | PLACEHOLDER 아님 |
 | 영역 분산 | `kubectl get pods -n myapp-prd -o wide` → 노드 zone 라벨 대조 | 2개 이상 영역 |
 | HPA | `kubectl get hpa -n myapp-prd` | `TARGETS` 값 표시 |
 | PDB | `kubectl get pdb -n myapp-prd` | `ALLOWED DISRUPTIONS ≥ 1` |
 | Ingress | `kubectl get ingress -n myapp-prd` | 주소 할당됨 |
-| **DB 공용 액세스** | `az postgres flexible-server show -g rg-myapp-prd -n psql-myapp-prd --query network.publicNetworkAccess -o tsv` | **`Disabled`** |
-| DB HA · 백업 | `--query "{ha:highAvailability.mode,bk:backup.backupRetentionDays}"` | `ZoneRedundant` · `14` |
+| **DB 공용 액세스** | `az postgres flexible-server show -g rg-myapp-prd -n psql-myapp-prd --query network.publicNetworkAccess -o tsv` | **`Disabled`**(myapp은 N/A — PostgreSQL 미생성) |
+| DB HA · 백업 | `--query "{ha:highAvailability.mode,bk:backup.backupRetentionDays}"` | `ZoneRedundant` · `14`(myapp은 N/A) |
 | 불변 태그 | `kubectl get deploy myapp -n myapp-prd -o jsonpath='{..image}'` | `:latest` 아님 |

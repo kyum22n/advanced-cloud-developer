@@ -19,6 +19,7 @@ __pycache__/
 **/test/e2e/report/
 test-results/
 playwright-report/
+.playwright-mcp/
 
 # 로컬 설정 · 비밀
 *.local.json

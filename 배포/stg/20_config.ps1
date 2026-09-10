@@ -94,7 +94,18 @@ if (-not $dbPw) {
     [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
     $dbPw = [Convert]::ToBase64String($bytes) -replace '[^A-Za-z0-9]', 'x'
 }
-kubectl create secret generic myapp-secret -n $ns --from-literal=DB_PASSWORD=$dbPw --dry-run=client -o yaml | kubectl apply -f -
+# myapp 자체가 실제로 쓰는 비밀값(GitHub PAT, Notion 토큰) — 없으면 빈 값으로 두어도 앱은 정상 동작한다
+# (Rate Limit이 낮아지거나 Notion 업로드가 401을 반환할 뿐 서버가 죽지 않는다). 하드코딩하지 않는다.
+$githubToken  = [Environment]::GetEnvironmentVariable('GITHUB_TOKEN')
+$notionToken  = [Environment]::GetEnvironmentVariable('NOTION_TOKEN')
+$notionPageId = [Environment]::GetEnvironmentVariable('NOTION_PARENT_PAGE_ID')
+
+kubectl create secret generic myapp-secret -n $ns `
+    --from-literal=DB_PASSWORD=$dbPw `
+    --from-literal=GITHUB_TOKEN=$githubToken `
+    --from-literal=NOTION_TOKEN=$notionToken `
+    --from-literal=NOTION_PARENT_PAGE_ID=$notionPageId `
+    --dry-run=client -o yaml | kubectl apply -f -
 Write-Ok 'Secret 적용 완료 (값은 출력하지 않음)'
 
 Write-Host ""
